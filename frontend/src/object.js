@@ -1,7 +1,15 @@
+var mapSize = 2000;
+
 class Pos{
     constructor(x,y){
         this.x=x;
         this.y=y;
+    }
+
+    randomPos(){
+        let x = Math.random() * 2 * mapSize - mapSize;
+        let y = Math.random() * 2 * mapSize - mapSize;
+        return new Pos(x,y)
     }
 
     move(dx,dy){
@@ -38,6 +46,7 @@ class Player{
         this.sw_angle = 0 * (Math.PI/180); // sword angle
         this.sw_r = 80; // sword radius
         this.hp = 100;
+        this.xp = 0;
     }
 
     move(dx,dy){
@@ -46,10 +55,10 @@ class Player{
     }
 
     bound(){
-        if(this.x>=400)this.x=400;
-        if(this.y>=400)this.y=400;
-        if(this.x<=-400)this.x=-400;
-        if(this.y<=-400)this.y=-400;
+        if(this.x>=mapSize)this.x=mapSize;
+        if(this.y>=mapSize)this.y=mapSize;
+        if(this.x<=-mapSize)this.x=-mapSize;
+        if(this.y<=-mapSize)this.y=-mapSize;
     }
 
     sw_rot(angle,clockwise=true){
@@ -71,4 +80,26 @@ class Player{
     }
 }
 
-export {Player, Pos}
+function getRandomColor() {
+    var letters = '0123456789ABCDEF';
+    var color = '#';
+    for (var i = 0; i < 6; i++) {
+      color += letters[Math.floor(Math.random() * 16)];
+    }
+    return color;
+}
+
+class Item{
+    constructor(pos){
+        this.pos = pos; 
+        this.color = getRandomColor();
+        this.xp = Math.floor(Math.random() * 16)+1;
+    }
+
+    eaten(player){
+        player.xp+=this.xp;
+        this.constructor(Pos.randomPos())
+    }
+}
+
+export {Player, Pos, Item}

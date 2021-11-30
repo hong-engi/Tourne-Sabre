@@ -1,7 +1,7 @@
 import logo from './logo.svg';
 import './App.css';
 import draw from './mapdraw.js'
-import {Player} from './player.js'
+import {Player} from './object.js'
 
 var player = new Player("James");
 
