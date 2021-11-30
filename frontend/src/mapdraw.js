@@ -24,7 +24,7 @@ function defaultMap(ctx){
 
 function drawPlayer(ctx,p){
     var circle = new Path2D();
-    circle.arc(center_h, center_w, 25, 0, 2 * Math.PI);
+    circle.arc(center_h, center_w, p.r, 0, 2 * Math.PI);
     ctx.fillStyle='red';
     ctx.strokeStyle='black';
     ctx.lineWidth=3;
@@ -36,12 +36,13 @@ function drawPlayer(ctx,p){
 
 function drawSword(ctx,p){
     const angle = -p.sw_angle;
+    const r = p.sw_r,w=p.sw_w,h=p.sw_h;
     var img = new Image();
     img.onload = function() {
         ctx.save();
         ctx.translate(center_w,center_h);
         ctx.rotate(angle);
-        ctx.drawImage(img,p.sw_r-50,0-15,100,30);
+        ctx.drawImage(img,0-w/2,-r-h/2,w,h);
         ctx.restore();
     };
     img.src = sword; 

@@ -1,4 +1,4 @@
-import logo from './logo.svg';
+//import logo from './logo.svg';
 import './App.css';
 import draw from './mapdraw.js'
 import {Player} from './object.js'
@@ -13,7 +13,7 @@ function App() {
         <p>
           Edit <code>src/App.js</code> and save to reload.
         </p> */}
-        {/* <a
+        {/* <a 
           className="App-link"
           href="https://reactjs.org"
           target="_blank"
