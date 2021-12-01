@@ -1,4 +1,17 @@
-var mapSize = 10000;
+var mapSize = 800;
+
+function getRandomColor() {
+    var letters = '6789ABCDEF';
+    var color = '#';
+    let i = Math.floor(Math.random()*3);
+    for(let j=0;j<3;j++){
+        if(j==i) color+='FF';
+        else for (var k = 0; k < 2; k++) {
+            color += letters[Math.floor(Math.random() * 10)];
+        }
+    }
+    return color;
+}
 
 class Pos{
     constructor(x,y){
@@ -6,10 +19,14 @@ class Pos{
         this.y=y;
     }
 
-    randomPos(){
+    static randomPos(){
         let x = Math.random() * 2 * mapSize - mapSize;
         let y = Math.random() * 2 * mapSize - mapSize;
         return new Pos(x,y)
+    }
+
+    dist(v){
+        return Math.pow((this.x-v.x)*(this.x-v.x)+(this.y-v.y)*(this.y-v.y),0.5)
     }
 
     move(dx,dy){
@@ -22,12 +39,12 @@ class Pos{
         this.y+=v.y;
     }
     
-    add(x,y){
-        return new Pos(this.x+x, this.y+y)
+    add(x,y,i=1){
+        return new Pos(this.x+x*i, this.y+y*i)
     }
 
-    addv(v){
-        return new Pos(this.x+v.x, this.y+v.y)
+    addv(v,i=1){
+        return new Pos(this.x+v.x*i, this.y+v.y*i)
     }
 
     rot(center,angle,clockwise = true){ // center point, angle in radian
@@ -51,6 +68,20 @@ class Player{
         this.sw_speed = 4 * (Math.PI/180);
         this.hp = 100;
         this.xp = 0;
+        this.color = getRandomColor();
+    }
+
+    static randomPlayer(){
+        function randomName(){
+            let alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz';
+            let name = '';
+            for(let i=0;i<10;i++)
+                name+=alphabet[Math.floor(Math.random()*alphabet.length)]
+            return name;
+        }
+        let p = new Player(randomName())
+        p.pos = Pos.randomPos();
+        return p;
     }
 
     trytohit(enemy){
@@ -120,14 +151,7 @@ class Player{
     }
 }
 
-function getRandomColor() {
-    var letters = '0123456789ABCDEF';
-    var color = '#';
-    for (var i = 0; i < 6; i++) {
-      color += letters[Math.floor(Math.random() * 16)];
-    }
-    return color;
-}
+
 
 class Item{
     constructor(pos){
@@ -135,6 +159,10 @@ class Item{
         this.color = getRandomColor();
         this.xp = Math.floor(Math.random() * 16)+1;
         this.r = Math.floor(Math.random() * 3)+3;
+    }
+
+    static randomItem(){
+        return new Item(Pos.randomPos())
     }
 
     eaten(player){

@@ -15,7 +15,7 @@ const Canvas = props => {
     const render = () => {
       frameCount++;
       props.player.sw_angle+=props.player.sw_speed;
-      draw(ctx, props.player,frameCount)
+      draw(ctx, props.player)
       animationFrameId = window.requestAnimationFrame(render)
     }
     render()

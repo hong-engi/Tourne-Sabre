@@ -1,8 +1,10 @@
 import './App.css';
 import {Player} from './object.js'
 import Canvas from './canvas.js'
+import {map} from './map.js'
 
 var player = new Player("James");
+map.push(player);
 
 function App() {
   return (
