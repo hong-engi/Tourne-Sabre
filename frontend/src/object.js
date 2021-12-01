@@ -46,8 +46,9 @@ class Player{
         this.r = 25;
         this.sw_angle = 0 * (Math.PI/180); // sword angle
         this.sw_r = 80; // sword radius
-        this.sw_w = 30;
+        this.sw_w = 40;
         this.sw_h = 100;
+        this.sw_speed = 4 * (Math.PI/180);
         this.hp = 100;
         this.xp = 0;
     }
