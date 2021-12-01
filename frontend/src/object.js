@@ -1,4 +1,4 @@
-var mapSize = 800;
+var mapSize = 3000;
 
 function getRandomColor() {
     var letters = '6789ABCDEF';
@@ -126,10 +126,10 @@ class Player{
     }
 
     bound(){
-        if(this.x>=mapSize)this.x=mapSize;
-        if(this.y>=mapSize)this.y=mapSize;
-        if(this.x<=-mapSize)this.x=-mapSize;
-        if(this.y<=-mapSize)this.y=-mapSize;
+        if(this.pos.x>=mapSize)this.pos.x=mapSize;
+        if(this.pos.y>=mapSize)this.pos.y=mapSize;
+        if(this.pos.x<=-mapSize)this.pos.x=-mapSize;
+        if(this.pos.y<=-mapSize)this.pos.y=-mapSize;
     }
 
     sw_rot(angle,clockwise=true){

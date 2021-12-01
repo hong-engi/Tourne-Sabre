@@ -1,15 +1,18 @@
 import sword from './sword.png'
 import {map} from './map.js'
 import {Player, Item} from './object.js'
-const map_size = 1200;
-const center_h = map_size/2;
-const center_w = map_size/2;
+const canvas_size = 1200;
+const center_h = canvas_size/2;
+const center_w = canvas_size/2;
 
 var img = new Image();
 img.src = sword; 
 
 //todo : canvas.width,canvas.height??
 function draw(ctx,player) {
+    ctx.StrokeStyle='black'
+    ctx.fillStyle='black'
+    ctx.fillRect(0,0,canvas_size,canvas_size);
     defaultMap(ctx)
     for(let i=0;i<map.length;i++){
         if(map[i] instanceof Item){
@@ -23,7 +26,6 @@ function draw(ctx,player) {
                 drawPlayer(ctx,player,map[i])
         }
     }
-    player.sw_rot(1*(2*Math.PI/180))
 }
 
 function defaultMap(ctx){
@@ -35,6 +37,7 @@ function defaultMap(ctx){
     ctx.fill(circle);
     ctx.stroke(circle);
 }
+
 function drawItem(ctx,me,i){
     var circle = new Path2D();
     let dpos = i.pos.addv(me.pos,-1), x=center_w+dpos.x, y=center_h+dpos.y;
