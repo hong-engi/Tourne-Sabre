@@ -25,6 +25,7 @@ function App() {
     window.addEventListener('keyup',handleKeyUp)
     // cleanup this component
     return () => {
+      console.log('removing keyboard')
       window.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('keyup',handleKeyUp)
     };

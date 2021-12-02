@@ -1,4 +1,12 @@
 var mapSize = 3000;
+function getRandomId(){
+    var letters = 'HONGENGIisworkingreallyhard'
+    var id = '';
+    for(let i=0;i<6;i++){
+        id += letters[Math.floor(Math.random()*letters.length)]
+    }
+    return id;
+}
 
 function getRandomColor() {
     var letters = '6789ABCDEF';
@@ -58,6 +66,7 @@ class Pos{
 
 class Player{
     constructor(name){
+        this.id = getRandomId();
         this.name = name;
         this.pos = new Pos(0,0);
         this.r = 25;
@@ -155,6 +164,7 @@ class Player{
 
 class Item{
     constructor(pos){
+        this.id = getRandomId();
         this.pos = pos; 
         this.color = getRandomColor();
         this.xp = Math.floor(Math.random() * 16)+1;
