@@ -30,14 +30,6 @@ class mapConstructor{
         })
     }
 
-    ate(item){
-        axios.delete(`/api/map/item/${item.id}/ate`)
-            .then(() => axios.get('/api/map/item'))
-            .then(response => {
-                this.itemList = response.data;
-        });
-    };
-
     kill(player){
         axios.delete(`/api/map/player/${player.id}/kill`)
             .then(() => axios.get('/api/map/player'))
@@ -48,6 +40,14 @@ class mapConstructor{
 
     addPlayer(player){
         axios.post(`/api/map/player/add`,player)
+            .then(() => axios.get('/api/map/player'))
+            .then(response => {
+                this.playerList = response.data;
+        });
+    };
+
+    deletePlayer(player){
+        axios.delete(`/api/map/player/delete`,player)
             .then(() => axios.get('/api/map/player'))
             .then(response => {
                 this.playerList = response.data;
@@ -66,7 +66,7 @@ class mapConstructor{
     }
 
     damage(player,dmg){
-        axios.put(`/api/map/player/${player.id}/damage`,dmg)
+        axios.put(`/api/map/player/${player.id}/damage`,{dmg:dmg})
             .then(() => axios.get('/api/map/player'))
             .then(response => {
                 this.playerList = response.data;
@@ -80,6 +80,14 @@ class mapConstructor{
             this.playerList = response.data;
         });
     }
+
+    ate(item){
+        axios.post(`/api/map/item/ate`,item)
+            .then(() => axios.get('/api/map/item'))
+            .then(response => {
+                this.itemList = response.data;
+        });
+    };
 };
 
 var map = new mapConstructor()

@@ -13,6 +13,7 @@ function getAll(callback) {
 
 function add(item, callback) {
   const newItem = new itemModel({
+    _id : item.id,
     x:item.pos.x,
     y:item.pos.y,
     color : item.color,
@@ -28,6 +29,19 @@ function add(item, callback) {
   });
 }
 
+function update(item, callback) {
+  itemModel.updateOne({_id: item.id}, 
+    {
+      x:item.pos.x,
+      y:item.pos.y,
+      color : item.color,
+      xp : item.xp,
+      r : item.r
+    },
+    () => {
+    callback();
+  });
+}
 function remove(id, callback) {
   itemModel.deleteOne({_id: id}, (error) => {
     console.log(error)
@@ -56,6 +70,7 @@ module.exports = {
   getAll,
   add,
   remove,
+  update,
   removeAll,
   getOne,
 };

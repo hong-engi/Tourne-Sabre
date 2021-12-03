@@ -46,9 +46,15 @@ router.delete("/all", (req, res) => {
   });
 })
 
-router.delete("/item/:id/ate", (req, res) => {
-  itemdb.remove(req.params.id, () => {
+router.delete("/player/delete", (req, res) => {
+  playerdb.remove(req.body, () => {
     res.status(200).send();
+  });
+});
+
+router.post("/item/ate", (req, res) => {
+  itemdb.update(req.body, (newItem) => {
+    res.json(newItem);
   });
 });
 
@@ -59,7 +65,7 @@ router.delete("/player/:id/kill", (req, res) => {
 });
 
 router.put("/player/:id/damage",(req, res) => {
-  playerdb.damage(req.params.id, req.body, () => {
+  playerdb.damage(req.params.id, req.body.dmg, () => {
     res.status(200).send();
   });
 });

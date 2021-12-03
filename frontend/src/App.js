@@ -6,9 +6,9 @@ import React from 'react'
 import useInterval from '@use-it/interval'
 import frameUpdate from './frameUpdater.js'
 
+map.deleteAll()
 var player = new Player("James");
-map.addPlayer(player);
-const fps = 60;
+const fps = 30;
 
 function App() {
   var pressedKeys = {};
@@ -23,11 +23,13 @@ function App() {
   React.useEffect(() => {
     window.addEventListener('keydown', handleKeyDown);
     window.addEventListener('keyup',handleKeyUp)
+    map.addPlayer(player);
     // cleanup this component
     return () => {
       console.log('removing keyboard')
       window.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('keyup',handleKeyUp)
+      map.deletePlayer(player);
     };
   }, []);
 

@@ -59,8 +59,7 @@ class Pos{
         if(clockwise)angle*=-1;
         const x = this.x - center.x
         const y = this.y - center.y
-        this.x = Math.cos(angle)*x-Math.sin(angle)*y+center.x;
-        this.y = Math.sin(angle)*x+Math.cos(angle)*y+center.y;
+        return new Pos(Math.cos(angle)*x-Math.sin(angle)*y+center.x,Math.sin(angle)*x+Math.cos(angle)*y+center.y)
     }
 }
 
@@ -70,8 +69,9 @@ class Player{
         this.name = name;
         this.pos = new Pos(x,y);
         this.r = 25;
+        this.speed = new Pos(0,0);
         this.sw_angle = 0 * (Math.PI/180); // sword angle
-        this.sw_r = 80; // sword radius
+        this.sw_r = 65; // sword radius
         this.sw_w = 40;
         this.sw_h = 100;
         this.sw_speed = 4 * (Math.PI/180);
@@ -99,6 +99,7 @@ class Player{
         newPlayer.id = sch._id
         newPlayer.name = sch.name
         newPlayer.pos = new Pos(sch.x,sch.y)
+        newPlayer.speed = new Pos(sch.vx,sch.vy)
         newPlayer.r = sch.r
         newPlayer.sw_angle = sch.sw_angle
         newPlayer.sw_r = sch.sw_r
@@ -110,31 +111,59 @@ class Player{
         return newPlayer
     }
 
+    addSpeed(x,y){
+        this.speed.move(x,y)
+    }
+
     trytohit(enemy){
+        if(enemy.id == this.id)return;
         let sp = this.sw_pos();
-        let w = this.sw_w;
-        let h = this.sw_h;
         function pos_x_line_meet(p1,p2,p){
-            return (p.y-p1.y)*(p.x-p2.x)/(p1.y-p2.y)+p1.x>p.x &&
-                (p.y-p1.y)*(p.y-p2.y)<0;
+            return ((p.y-p1.y)*(p.x-p2.x)/(p1.y-p2.y)+p1.x>p.x) &&
+                ((p.y-p1.y)*(p.y-p2.y)<0);
+        }
+        function dist(p1,p){
+            return Math.pow(Math.pow(p1.x-p.x,2)+Math.pow(p1.y-p.y,2),0.5)
+        }
+        function point_circle_meet(p1,p,r){
+            return dist(p1,p)<r
+        }
+        function angleof3p(pr,p,pl){
+            let prp = dist(pr,p)
+            let plp = dist(pl,p)
+            let prl = dist(pr,pl)
+            return Math.acos((prp*prp+plp*plp+prl*prl)/(2*prp*plp))
         }
         function line_circle_meet(p1,p2,p,r){
             let a=p2.y-p1.y,b=p1.x-p2.x,c=p1.x*(p1.y-p2.y)+p1.y*(p2.x-p1.x);
             let d = Math.abs(a*p.x+b*p.y+c)/Math.pow(a*a+b*b,0.5)
-            return d<r;
+            if(d<r){
+                return angleof3p(p,p1,p2)<Math.PI/2 && angleof3p(p,p2,p1)<Math.PI/2
+            }
         }
         let meet_cnt = 0;
-        let dir = [1,1];
+        let w = this.sw_w/2;
+        let h = this.sw_h/2;
+        let alpha = Math.atan(w/h)
+        let beta = this.sw_angle-alpha
+        let r = Math.pow(w*w+h*h,0.5)
+        var dir = [new Pos(0,-r).rot(new Pos(0,0),beta),
+            new Pos(0,-r).rot(new Pos(0,0),beta+2*alpha)]
         for(let i=0;i<4;i++){
-            let p1 = new Pos(sp.x+w*dir[0],sp.y+h*dir[1]);
-            let p2 = new Pos(sp.x+w*dir[0],sp.y-h*dir[1]);
-            if(pos_x_line_meet(p1,p2,enemy.pos))meet_cnt++;
-            if(line_circle_meet(p1,p2,enemy.pos,enemy.r)){
+            let p1 = sp.addv(dir[0]);
+            let p2 = sp.addv(dir[1]);
+            if(pos_x_line_meet(p1,p2,enemy.pos)){
+                console.log('linemeet',p1,p2,enemy.pos)
+                meet_cnt++;
+            }
+            if(point_circle_meet(p1,enemy.pos,enemy.r) || 
+                line_circle_meet(p1,p2,enemy.pos,enemy.r)){
+                console.log('lcmeet',p1,p2,enemy.pos,enemy.r)
                 meet_cnt=1;
                 break;
             }
             let tmp = dir[0];
-            dir[0]=-dir[1];
+            dir[0] = new Pos(0,0).addv(dir[1],-1);
             dir[1]=tmp;
         }
         return meet_cnt%2 === 1
@@ -146,8 +175,13 @@ class Player{
         return Math.pow(i.x-p.x,2)+Math.pow(i.y-p.y,2)<=Math.pow(this.r+item.r,2)
     }
 
+    accel(){
+        this.speed.move(-this.speed.x/15,-this.speed.y/15)
+    }
+
     move(dx,dy){
-        this.pos.move(dx,dy)
+        this.pos.movev(this.speed)
+        this.accel()
         this.bound()
     }
 
@@ -165,11 +199,12 @@ class Player{
     }
 
     sw_pos(){
-        return this.pos.add(this.sw_r,0).rot(this.pos,this.sw_angle);
+        let p = this.pos.add(0,-this.r-this.sw_r)
+        return p.rot(this.pos,this.sw_angle);
     }
 
-    hp_change(dhp){
-        this.hp+=dhp;
+    attacked(dhp){
+        this.hp-=dhp;
     }
 
     dead(){
@@ -181,11 +216,16 @@ class Player{
 
 class Item{
     constructor(pos){
+        this.init(pos)
         this.id = getRandomId();
+    }
+
+    init(pos){
         this.pos = pos; 
         this.color = getRandomColor();
         this.xp = Math.floor(Math.random() * 16)+1;
-        this.r = Math.floor(Math.random() * 3)+3;
+        this.r = Math.floor(Math.random() * 10)+3;
+        this.eatenflag = false
     }
 
     static schemaItem(sch){
@@ -203,8 +243,12 @@ class Item{
     }
 
     eaten(player){
+        this.eatenflag = true
         player.xp+=this.xp;
-        this.constructor(Pos.randomPos())
+        player.hp = 50
+        player.r = 25+player.xp/10
+        this.init(Pos.randomPos())
+        console.log(this.id) 
     }
 }
 

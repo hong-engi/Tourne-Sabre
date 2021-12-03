@@ -17,6 +17,8 @@ function add(player, callback) {
     name:player.name,
     x:player.pos.x,
     y:player.pos.y,
+    vx:player.speed.x,
+    vy:player.speed.y,
     r:player.r,
     sw_angle:player.sw_angle,
     sw_r:player.sw_r,
@@ -44,8 +46,8 @@ function removeAll(callback){
   })
 }
 
-function remove(id, callback) {
-  playerModel.deleteOne({_id: id}, (error) => {
+function remove(player, callback) {
+  playerModel.deleteOne({_id: player.id}, (error) => {
     console.log(error)
     callback();
   });
@@ -67,6 +69,9 @@ function update(player, callback) {
     {
       x:player.pos.x,
       y:player.pos.y,
+      r:player.r,
+      vx:player.speed.x,
+      vy:player.speed.y,
       sw_angle:player.sw_angle,
       sw_r:player.sw_r,
       hp:player.hp,
@@ -83,6 +88,10 @@ function damage(id, dhp, callback) {
       console.log(error);
       callback([]);
     } else {
+      if(found == null){
+        console.log(id)
+        return;
+      }
       playerModel.updateOne({_id: id}, {hp: found.hp-dhp}, () => {
         callback();
       });  

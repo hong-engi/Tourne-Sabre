@@ -4,6 +4,8 @@ const playerSchema = new mongoose.Schema({
     name:String,
     x:Number,
     y:Number,
+    vx:Number,
+    vy:Number,
     r:Number,
     sw_angle:Number,
     sw_r:Number,
