@@ -1,6 +1,6 @@
 const express = require("express");
 const itemdb = require("../db/itemdb");
-const playerdb = require("../db/itemdb");
+const playerdb = require("../db/playerdb");
 const router  = express.Router();
 
 router.get("/item", (req, res) => {
@@ -15,28 +15,51 @@ router.get("/player", (req, res) => {
   });
 });
 
-router.post("/item", (req, res) => {
-  const {name} = req.body;
-  itemdb.add(name, (newItem) => {
+router.post("/item/add", (req, res) => {
+  itemdb.add(req.body, (newItem) => {
     res.json(newItem);
   });
 });
 
-router.post("/player", (req, res) => {
-  const {name} = req.body;
-  playerdb.add(name, (newItem) => {
+router.post("/test", (req, res) => {
+  console.log('testing...')
+});
+
+router.post("/player/add", (req, res) => {
+  playerdb.add(req.body, (newItem) => {
     res.json(newItem);
   });
 });
 
-router.delete("/item/:id", (req, res) => {
+router.post("/player/update", (req, res) => {
+  playerdb.update(req.body, (newItem) => {
+    res.json(newItem);
+  });
+});
+
+router.delete("/all", (req, res) => {
+  playerdb.removeAll(() => {
+    res.status(200).send();
+  });
+  itemdb.removeAll(() => {
+    res.status(200).send();
+  });
+})
+
+router.delete("/item/:id/ate", (req, res) => {
   itemdb.remove(req.params.id, () => {
     res.status(200).send();
   });
 });
 
-router.delete("/player/:id", (req, res) => {
+router.delete("/player/:id/kill", (req, res) => {
   playerdb.remove(req.params.id, () => {
+    res.status(200).send();
+  });
+});
+
+router.put("/player/:id/damage",(req, res) => {
+  playerdb.damage(req.params.id, req.body, () => {
     res.status(200).send();
   });
 });

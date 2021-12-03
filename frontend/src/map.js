@@ -1,48 +1,87 @@
-import { Player,Item } from "./object";
 import axios from "axios";
+import {Item} from "./object.js"
 
-//나중에 데이터베이스로 이전
-const map = () => {
-    var itemList;
-    var playerList;
-    const getItems = () => {
-        axios.get(`/api/item`)
-        .then(response => {
-            itemList = response.data;
-        })
-    }
-    const getPlayers = () => {
-        axios.get(`/api/player`)
-        .then(response => {
-            playerList = response.data;
-        })
+class mapConstructor{
+    constructor(){
+        this.itemList=[];
+        this.playerList=[];
     }
 
-    const ate = (item) => {
-        axios.delete(`/api/item/${item._id}/ate`)
-            .then(() => axios.get('/api/item'))
+    test(){
+        axios.post('api/map/test')
+        console.log('test success')
+    }
+
+    deleteAll(){
+        axios.delete('api/map/all')
+        console.log('deleted All')
+    }
+
+    getItems(){
+        axios.get(`/api/map/item`)
+        .then(response => {
+            this.itemList = response.data;
+        })
+    }
+    getPlayers(){
+        axios.get(`/api/map/player`)
+        .then(response => {
+            this.playerList = response.data;
+        })
+    }
+
+    ate(item){
+        axios.delete(`/api/map/item/${item.id}/ate`)
+            .then(() => axios.get('/api/map/item'))
             .then(response => {
-            itemList = response.data;
+                this.itemList = response.data;
         });
     };
 
-    const kill = (player) => {
-        axios.delete(`/api/player/${player._id}/kill`)
-            .then(() => axios.get('/api/kill'))
+    kill(player){
+        axios.delete(`/api/map/player/${player.id}/kill`)
+            .then(() => axios.get('/api/map/player'))
             .then(response => {
-            playerList = response.data;
+                this.playerList = response.data;
         });
     };
 
-    const damage = (player) => {
+    addPlayer(player){
+        axios.post(`/api/map/player/add`,player)
+            .then(() => axios.get('/api/map/player'))
+            .then(response => {
+                this.playerList = response.data;
+        });
+    };
+
+    addItem(num = 5){
+        for(let i=0;i<num;i++){
+            let item = Item.randomItem()
+            axios.post(`/api/map/item/add`,item)
+            .then(() => axios.get('/api/map/item'))
+            .then(response => {
+                this.itemList = response.data;
+            });
+        }
     }
 
+    damage(player,dmg){
+        axios.put(`/api/map/player/${player.id}/damage`,dmg)
+            .then(() => axios.get('/api/map/player'))
+            .then(response => {
+                this.playerList = response.data;
+        });
+    }
 
-
+    playerUpdate(player){
+        axios.post(`/api/map/player/update`,player)
+        .then(() => axios.get('/api/map/player'))
+        .then(response => {
+            this.playerList = response.data;
+        });
+    }
 };
-// for(let i=0;i<40;i++)
-//     map.push(Player.randomPlayer())
-// for(let i=0;i<1000;i++)
-//     map.push(Item.randomItem())
+
+var map = new mapConstructor()
 
 export {map}

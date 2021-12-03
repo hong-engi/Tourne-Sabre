@@ -1,11 +1,11 @@
 const mongoose = require( "mongoose" );
 const itemSchema = new mongoose.Schema({
-    id:String,
-    pos:[Number],
+    x:Number,
+    y:Number,
     color:String,
     xp:Number,
     r:Number,
 });
-const itemModel = mongoose.model("todo", itemSchema);
+const itemModel = mongoose.model("item", itemSchema);
 
 module.exports = itemModel;

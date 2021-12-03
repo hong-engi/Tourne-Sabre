@@ -33,8 +33,8 @@ class Pos{
         return new Pos(x,y)
     }
 
-    dist(v){
-        return Math.pow((this.x-v.x)*(this.x-v.x)+(this.y-v.y)*(this.y-v.y),0.5)
+    dist(v2){
+        return Math.pow((this.x-v2.x)*(this.x-v2.x)+(this.y-v2.y)*(this.y-v2.y),0.5)
     }
 
     move(dx,dy){
@@ -65,10 +65,10 @@ class Pos{
 }
 
 class Player{
-    constructor(name){
+    constructor(name,x=0,y=0){
         this.id = getRandomId();
         this.name = name;
-        this.pos = new Pos(0,0);
+        this.pos = new Pos(x,y);
         this.r = 25;
         this.sw_angle = 0 * (Math.PI/180); // sword angle
         this.sw_r = 80; // sword radius
@@ -77,6 +77,7 @@ class Player{
         this.sw_speed = 4 * (Math.PI/180);
         this.hp = 100;
         this.xp = 0;
+     
         this.color = getRandomColor();
     }
 
@@ -91,6 +92,22 @@ class Player{
         let p = new Player(randomName())
         p.pos = Pos.randomPos();
         return p;
+    }
+
+    static schemaPlayer(sch){
+        let newPlayer = new Player()
+        newPlayer.id = sch._id
+        newPlayer.name = sch.name
+        newPlayer.pos = new Pos(sch.x,sch.y)
+        newPlayer.r = sch.r
+        newPlayer.sw_angle = sch.sw_angle
+        newPlayer.sw_r = sch.sw_r
+        newPlayer.sw_h = sch.sw_h
+        newPlayer.sw_speed = sch.sw_speed
+        newPlayer.hp = sch.hp
+        newPlayer.xp = sch.xp
+        newPlayer.color = sch.color
+        return newPlayer
     }
 
     trytohit(enemy){
@@ -169,6 +186,16 @@ class Item{
         this.color = getRandomColor();
         this.xp = Math.floor(Math.random() * 16)+1;
         this.r = Math.floor(Math.random() * 3)+3;
+    }
+
+    static schemaItem(sch){
+        let newItem = new Item()
+        newItem.id = sch._id
+        newItem.pos = new Pos(sch.x,sch.y)
+        newItem.color = sch.color
+        newItem.xp = sch.xp
+        newItem.r = sch.r
+        return newItem
     }
 
     static randomItem(){

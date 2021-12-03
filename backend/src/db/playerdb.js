@@ -13,8 +13,10 @@ function getAll(callback) {
 
 function add(player, callback) {
   const newItem = new playerModel({
+    _id : player.id,
     name:player.name,
-    pos:[player.pos.x,player.pos.y],
+    x:player.pos.x,
+    y:player.pos.y,
     r:player.r,
     sw_angle:player.sw_angle,
     sw_r:player.sw_r,
@@ -26,8 +28,20 @@ function add(player, callback) {
     color:player.color,
   });
   newItem.save((error,result)=>{
-    callback(result);
+    if(error){
+      console.log('error',error);
+    } else {
+      console.log('added',player.name)
+      callback(result);
+    }
   });
+}
+
+function removeAll(callback){
+  playerModel.deleteMany({},(error) => {
+    console.log(error)
+    callback();
+  })
 }
 
 function remove(id, callback) {
@@ -48,7 +62,22 @@ function getOne(id, callback) {
   });
 }
 
-function changeHp(id, dhp, callback) {
+function update(player, callback) {
+  playerModel.updateOne({_id: player.id}, 
+    {
+      x:player.pos.x,
+      y:player.pos.y,
+      sw_angle:player.sw_angle,
+      sw_r:player.sw_r,
+      hp:player.hp,
+      xp:player.xp,
+    },
+    () => {
+    callback();
+  });
+}
+
+function damage(id, dhp, callback) {
   playerModel.findOne({_id: id}, (err, found) => {
     if(err){
       console.log(error);
@@ -65,6 +94,8 @@ module.exports = {
   getAll,
   add,
   remove,
+  removeAll,
   getOne,
-  changeHp
+  update,
+  damage
 };

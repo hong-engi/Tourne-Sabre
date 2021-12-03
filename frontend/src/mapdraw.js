@@ -1,6 +1,6 @@
 import sword from './sword.png'
 import {map} from './map.js'
-import {Player, Item} from './object.js'
+import {Pos, Player, Item} from './object.js'
 const canvas_size = 1200;
 const center_h = canvas_size/2;
 const center_w = canvas_size/2;
@@ -14,16 +14,18 @@ function draw(ctx,player) {
     ctx.fillStyle='black'
     ctx.fillRect(0,0,canvas_size,canvas_size);
     defaultMap(ctx)
-    for(let i=0;i<map.length;i++){
-        if(map[i] instanceof Item){
-            if(map[i].pos.dist(player.pos)<400-map[i].r)
-                drawItem(ctx,player,map[i])
+
+    for(let i=0;i<map.itemList.length;i++){
+        let item = Item.schemaItem(map.itemList[i])
+        if(player.pos.dist(item.pos)<400-item.r){
+            drawItem(ctx,player,item)
         }
     }
-    for(let i=0;i<map.length;i++){
-        if(map[i] instanceof Player){
-            if(map[i].pos.dist(player.pos)<400-map[i].r)
-                drawPlayer(ctx,player,map[i])
+
+    for(let i=0;i<map.playerList.length;i++){
+        let player2 = Player.schemaPlayer(map.playerList[i])
+        if(player.pos.dist(player2.pos)<400-player2.r){
+            drawPlayer(ctx,player,player2)
         }
     }
 }
@@ -52,9 +54,10 @@ function drawItem(ctx,me,i){
 function drawPlayer(ctx,me,p){
     var circle = new Path2D();
     let dpos = p.pos.addv(me.pos,-1), x=center_w+dpos.x, y=center_h+dpos.y;
+    if(me.id == p.id){x=center_w;y=center_h;}
     circle.arc(x, y, p.r, 0, 2 * Math.PI);
     ctx.fillStyle=p.color;
-    if(me === p)ctx.fillStyle='red';
+    if(me.id == p.id)ctx.fillStyle='red';
     ctx.strokeStyle='black';
     ctx.lineWidth=1;
     ctx.fill(circle);
@@ -66,6 +69,7 @@ function drawPlayer(ctx,me,p){
 function drawSword(ctx,me,p){
     const angle = -p.sw_angle;
     let dpos = p.pos.addv(me.pos,-1), x=center_w+dpos.x, y=center_h+dpos.y;
+    if(me.id == p.id){x=center_w;y=center_h;}
     const r = p.sw_r,w=p.sw_w,h=p.sw_h;
     ctx.save();
     ctx.translate(x,y);
@@ -76,8 +80,9 @@ function drawSword(ctx,me,p){
 
 function drawString(ctx,me,p){
     let dpos = p.pos.addv(me.pos,-1), x=center_w+dpos.x, y=center_h+dpos.y;
+    if(me.id == p.id){x=center_w;y=center_h;}
     ctx.fillStyle='black';
-    if(me === p)ctx.fillStyle='white';
+    if(me.id == p.id)ctx.fillStyle='white';
     ctx.font = '15px Dosis-Bold';
     let text = p.name
     let width = ctx.measureText(text).width;

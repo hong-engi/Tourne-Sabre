@@ -13,13 +13,18 @@ function getAll(callback) {
 
 function add(item, callback) {
   const newItem = new itemModel({
-    pos : [item.x,item.y],
+    x:item.pos.x,
+    y:item.pos.y,
     color : item.color,
     xp : item.xp,
     r : item.r
   });
   newItem.save((error,result)=>{
-    callback(result);
+    if(error){
+      console.log(error);
+    } else {
+      callback(result);
+    }
   });
 }
 
@@ -28,6 +33,13 @@ function remove(id, callback) {
     console.log(error)
     callback();
   });
+}
+
+function removeAll(callback){
+  itemModel.deleteMany({},(error) => {
+    console.log(error)
+    callback();
+  })
 }
 
 function getOne(id, callback) {
@@ -44,5 +56,6 @@ module.exports = {
   getAll,
   add,
   remove,
+  removeAll,
   getOne,
 };

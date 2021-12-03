@@ -7,7 +7,7 @@ import useInterval from '@use-it/interval'
 import frameUpdate from './frameUpdater.js'
 
 var player = new Player("James");
-map.push(player);
+map.addPlayer(player);
 const fps = 60;
 
 function App() {

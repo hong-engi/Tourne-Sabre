@@ -7,19 +7,19 @@ const Canvas = props => {
 
   useEffect(() => {
   
-  const canvas = canvasRef.current
-  const ctx = canvas.getContext('2d')
-  let frameCount = 0
-  let animationFrameId
-  
-  const render = () => {
-    frameCount++;
-    props.player.sw_angle+=props.player.sw_speed;
-    draw(ctx, props.player)
-    animationFrameId = window.requestAnimationFrame(render)
-  }
-  render()
-  
+    const canvas = canvasRef.current
+    const ctx = canvas.getContext('2d')
+    let frameCount = 0
+    let animationFrameId
+    
+    const render = () => {
+      frameCount++;
+      draw(ctx, props.player)
+      animationFrameId = window.requestAnimationFrame(render)
+    }
+
+    render()
+
     return () => {
       window.cancelAnimationFrame(animationFrameId)
     }

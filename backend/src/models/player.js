@@ -1,8 +1,9 @@
 const mongoose = require( "mongoose" );
 const playerSchema = new mongoose.Schema({
-    id:String,
+    _id:String,
     name:String,
-    pos:[Number],
+    x:Number,
+    y:Number,
     r:Number,
     sw_angle:Number,
     sw_r:Number,
@@ -13,6 +14,6 @@ const playerSchema = new mongoose.Schema({
     xp:Number,
     color:String,
 });
-const playerModel = mongoose.model("todo", playerSchema);
+const playerModel = mongoose.model("player", playerSchema);
 
 module.exports = playerModel;
