@@ -3,7 +3,7 @@ const playerModel = require("../models/player")
 function getAll(callback) {
   playerModel.find({},(error,result)=>{
     if (error) {
-      console.log(error);
+      console.log('playergetall',error);
       callback([]);
     } else {
       callback(result);
@@ -33,9 +33,8 @@ function add(player, callback) {
   });
   newItem.save((error,result)=>{
     if(error){
-      console.log('error',error);
+      console.log('playersave',error);
     } else {
-      console.log('added',player.name)
       callback(result);
     }
   });
@@ -43,14 +42,16 @@ function add(player, callback) {
 
 function removeAll(callback){
   playerModel.deleteMany({},(error) => {
-    if(error)console.log('notremoved',error)
+    if(error)
+      console.log('notremoved',error)
     callback();
   })
 }
 
 function remove(id, callback) {
   playerModel.deleteOne({_id: id}, (error) => {
-    if(error)console.log('notdeleted',error)
+    if(error)
+      console.log('notdeleted',error)
     callback();
   });
 }
@@ -76,8 +77,6 @@ function update(player, callback) {
       vy:player.speed.y,
       sw_angle:player.sw_angle,
       sw_r:player.sw_r,
-      hp:player.hp,
-      hpmax:player.hpmax,
       xp:player.xp,
       lv:player.lv,
     },
@@ -89,11 +88,11 @@ function update(player, callback) {
 function damage(id, dhp, callback) {
   playerModel.findOne({_id: id}, (err, found) => {
     if(err){
-      console.log(error);
+      console.log('playerdamage',error);
       callback([]);
     } else {
       if(found == null){
-        console.log(id)
+        console.log('foundnull',id)
         return;
       }
       playerModel.updateOne({_id: id}, {hp: found.hp-dhp}, () => {

@@ -188,10 +188,10 @@ class Player{
     }
 
     bound(){
-        if(this.pos.x>=mapSize)this.pos.x=mapSize;
-        if(this.pos.y>=mapSize)this.pos.y=mapSize;
-        if(this.pos.x<=-mapSize)this.pos.x=-mapSize;
-        if(this.pos.y<=-mapSize)this.pos.y=-mapSize;
+        if(this.pos.x>=mapSize)this.pos.x=mapSize+(this.pos.x-mapSize)/1.3;
+        if(this.pos.y>=mapSize)this.pos.y=mapSize+(this.pos.y-mapSize)/1.3;
+        if(this.pos.x<=-mapSize)this.pos.x=-mapSize+(this.pos.x+mapSize)/1.3;
+        if(this.pos.y<=-mapSize)this.pos.y=-mapSize+(this.pos.y+mapSize)/1.3;
     }
 
     sw_rot(angle,clockwise=true){
@@ -205,12 +205,12 @@ class Player{
         return p.rot(this.pos,this.sw_angle);
     }
 
-    attacked(dhp){
-        this.hp-=dhp;
+    damage(dhp){
+        this.hp=Math.max(0,this.hp-dhp)
     }
 
     dead(){
-        return (this.hp < 0)
+        return (this.hp <= 0)
     }
 
     xpup(xp){

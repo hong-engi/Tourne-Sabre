@@ -9,6 +9,12 @@ router.get("/item", (req, res) => {
   });
 });
 
+router.get("/player/:id", (req, res) => {
+  playerdb.getOne(req.params.id, (item) => {
+    res.json(item);
+  });
+});
+
 router.get("/player", (req, res) => {
   playerdb.getAll((items) => {
     res.json(items);

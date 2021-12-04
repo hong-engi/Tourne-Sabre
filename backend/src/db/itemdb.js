@@ -3,7 +3,7 @@ const itemModel = require("../models/item")
 function getAll(callback) {
   itemModel.find({},(error,result)=>{
     if (error) {
-      console.log(error);
+      console.log('itemgetall',error);
       callback([]);
     } else {
       callback(result);
@@ -22,7 +22,7 @@ function add(item, callback) {
   });
   newItem.save((error,result)=>{
     if(error){
-      console.log(error);
+      console.log('itemadd',error);
     } else {
       callback(result);
     }
@@ -44,14 +44,16 @@ function update(item, callback) {
 }
 function remove(id, callback) {
   itemModel.deleteOne({_id: id}, (error) => {
-    console.log(error)
+    if(error)
+      console.log('itemremove',error)
     callback();
   });
 }
 
 function removeAll(callback){
   itemModel.deleteMany({},(error) => {
-    console.log(error)
+    if(error)
+      console.log('itemremoveall',error)
     callback();
   })
 }
@@ -59,7 +61,7 @@ function removeAll(callback){
 function getOne(id, callback) {
   itemModel.findOne({_id: id}, (err, found) => {
     if(err){
-      console.log(error);
+      console.log('itemgetone',error);
       callback([]);
     } else {
       callback(found);

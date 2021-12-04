@@ -1,6 +1,8 @@
 import axios from "axios";
 import {Item} from "./object.js"
 
+const sitetxt = 'https://localhost:8080/'
+
 class mapConstructor{
     constructor(){
         this.itemList=[];
@@ -79,6 +81,11 @@ class mapConstructor{
         .then(response => {
             this.playerList = response.data;
         });
+    }
+
+    playerUpdateBack(player){
+        axios.get(`/api/map/player/${player.id}`)
+        .then((found) => {player.hp = found.data.hp})
     }
 
     ate(item){

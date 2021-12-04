@@ -23,11 +23,6 @@
   font-size: calc(10px + 2vmin);
   color: black;
 }
-
-.App-link {
-  color: #616161;
-}
-
 @keyframes App-logo-spin {
   from {
     transform: rotate(0deg);
@@ -35,6 +30,15 @@
   to {
     transform: rotate(360deg);
   }
+}
+.above {
+  position: absolute;
+  background-color: rgba(50,50,50,0.5);
+  top: 50%;
+  left: 50%;
+  -moz-transform: translateX(-50%) translateY(-50%);
+  -webkit-transform: translateX(-50%) translateY(-50%);
+  transform: translateX(-50%) translateY(-50%);
 }
 
 .center {
