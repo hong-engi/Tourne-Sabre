@@ -42,19 +42,20 @@ function draw(ctx,player) {
     ctx.arc(center_w,center_h,400,0,Math.PI*2,true);
     ctx.closePath();
     ctx.fill();
-
+    /*
     ctx.fillStyle = 'purple'
     let sp = player.sw_pos()
     var circle = new Path2D();
     circle.arc(center_w+sp.x-player.pos.x, center_h+sp.y-player.pos.y, 3, 0, 2 * Math.PI);
     circle.arc(center_w-player.pos.x, center_h-player.pos.y, 3, 0, 2 * Math.PI);
     ctx.fill(circle);
+    */
 
     ctx.font = '20px Dosis-Bold';
     ctx.fillStyle = 'white'
     let text = '('+String(Math.round(player.pos.x))+','+String(Math.round(player.pos.y))+')'
     ctx.fillText(text,200,300)
-
+    /*
     let w = player.sw_w/2;
     let h = player.sw_h/2;
     let alpha = Math.atan(w/h)
@@ -72,6 +73,7 @@ function draw(ctx,player) {
         dir[0] = new Pos(0,0).addv(dir[1],-1);
         dir[1] = tmp;
     }
+    */
 
 }
 
@@ -97,9 +99,9 @@ function drawItem(ctx,me,i){
 }
 
 function drawPlayer(ctx,me,p){
+    if(me.id == p.id){p=me}
     var circle = new Path2D();
     let dpos = p.pos.addv(me.pos,-1), x=center_w+dpos.x, y=center_h+dpos.y;
-    if(me.id == p.id){x=center_w;y=center_h;}
     circle.arc(x, y, p.r, 0, 2 * Math.PI);
     ctx.fillStyle=p.color;
     if(me.id == p.id)ctx.fillStyle='red';
@@ -114,7 +116,6 @@ function drawPlayer(ctx,me,p){
 
 function drawHealthbar(ctx,me,p){
     let dpos = p.pos.addv(me.pos,-1), x=center_w+dpos.x, y=center_h+dpos.y;
-    if(me.id == p.id){x=center_w;y=center_h;}
     ctx.strokeStyle = '#77FF77'
     ctx.fillStyle = '#77FF77'
     ctx.lineWidth=2;
@@ -127,7 +128,6 @@ function drawHealthbar(ctx,me,p){
 function drawSword(ctx,me,p){
     const angle = -p.sw_angle;
     let dpos = p.pos.addv(me.pos,-1), x=center_w+dpos.x, y=center_h+dpos.y;
-    if(me.id == p.id){x=center_w;y=center_h;}
     const r = p.r+p.sw_r,w=p.sw_w,h=p.sw_h;
     ctx.save();
         ctx.translate(x,y);
@@ -138,13 +138,12 @@ function drawSword(ctx,me,p){
 
 function drawString(ctx,me,p){
     let dpos = p.pos.addv(me.pos,-1), x=center_w+dpos.x, y=center_h+dpos.y;
-    if(me.id == p.id){x=center_w;y=center_h;}
     ctx.fillStyle='black';
     if(me.id == p.id)ctx.fillStyle='white';
-    ctx.font = '15px Dosis-Bold';
+    ctx.font = String(Math.floor(p.r*15/25))+'px Dosis-Bold';
     let text = p.name
     let width = ctx.measureText(text).width;
-    ctx.fillText(text,x-(width/2),y+5)
+    ctx.fillText(text,x-(width/2),y+(p.r*5/25))
 }
 
 export default draw;

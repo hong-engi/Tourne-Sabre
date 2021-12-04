@@ -1,5 +1,6 @@
 import {Player,Item} from './object.js'
 import {map} from './map.js'
+var ateItemid = null
 var flag = true
 var delflag = true
 function frameUpdate(player,pKeys){
@@ -15,7 +16,8 @@ function frameUpdate(player,pKeys){
 
   for(let i=0;i<map.itemList.length;i++){
     let item = Item.schemaItem(map.itemList[i])
-    if(!item.eatenflag && player.trytoeat(item)){
+    if(player.trytoeat(item)&&ateItemid != item.id){
+      ateItemid = item.id
       item.eaten(player)
       console.log(player.xp)
       map.ate(item)
@@ -25,8 +27,7 @@ function frameUpdate(player,pKeys){
   for(let i=0;i<map.playerList.length;i++){
     let player2 = Player.schemaPlayer(map.playerList[i])
     if(player.trytohit(player2)){
-      console.log('hit',player2.name)
-      map.damage(player2,10)
+      map.damage(player2,5)
     }
   }
 

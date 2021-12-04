@@ -153,12 +153,10 @@ class Player{
             let p1 = sp.addv(dir[0]);
             let p2 = sp.addv(dir[1]);
             if(pos_x_line_meet(p1,p2,enemy.pos)){
-                console.log('linemeet',p1,p2,enemy.pos)
                 meet_cnt++;
             }
             if(point_circle_meet(p1,enemy.pos,enemy.r) || 
                 line_circle_meet(p1,p2,enemy.pos,enemy.r)){
-                console.log('lcmeet',p1,p2,enemy.pos,enemy.r)
                 meet_cnt=1;
                 break;
             }
@@ -225,7 +223,6 @@ class Item{
         this.color = getRandomColor();
         this.xp = Math.floor(Math.random() * 16)+1;
         this.r = Math.floor(Math.random() * 10)+3;
-        this.eatenflag = false
     }
 
     static schemaItem(sch){
@@ -243,12 +240,9 @@ class Item{
     }
 
     eaten(player){
-        this.eatenflag = true
         player.xp+=this.xp;
-        player.hp = 50
-        player.r = 25+player.xp/10
+        player.r = Math.pow(25*25+player.xp,0.5)
         this.init(Pos.randomPos())
-        console.log(this.id) 
     }
 }
 
