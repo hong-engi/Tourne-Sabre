@@ -77,6 +77,8 @@ class Player{
         this.sw_speed = 4 * (Math.PI/180);
         this.hp = 100;
         this.xp = 0;
+        this.lv = 1;
+        this.hpmax = 100;
      
         this.color = getRandomColor();
     }
@@ -106,7 +108,9 @@ class Player{
         newPlayer.sw_h = sch.sw_h
         newPlayer.sw_speed = sch.sw_speed
         newPlayer.hp = sch.hp
+        newPlayer.hpmax = sch.hpmax
         newPlayer.xp = sch.xp
+        newPlayer.lv = sch.lv
         newPlayer.color = sch.color
         return newPlayer
     }
@@ -206,7 +210,19 @@ class Player{
     }
 
     dead(){
-        return (this.hp <= 0)
+        return (this.hp < 0)
+    }
+
+    xpup(xp){
+        this.xp+=xp;
+        this.r = Math.pow(25*25+this.xp,0.5)
+        if(Math.pow(this.xp/50,0.5)>this.lv)this.lvup()
+    }
+
+    lvup(){
+        this.lv+=1
+        this.hpmax+=25
+        this.hp+=25
     }
 }
 
@@ -240,8 +256,7 @@ class Item{
     }
 
     eaten(player){
-        player.xp+=this.xp;
-        player.r = Math.pow(25*25+player.xp,0.5)
+        player.xpup(this.xp)
         this.init(Pos.randomPos())
     }
 }

@@ -26,7 +26,9 @@ function add(player, callback) {
     sw_h:player.sw_h,
     sw_speed:player.sw_speed,
     hp:player.hp,
+    hpmax:player.hpmax,
     xp:player.xp,
+    lv:player.lv,
     color:player.color,
   });
   newItem.save((error,result)=>{
@@ -41,14 +43,14 @@ function add(player, callback) {
 
 function removeAll(callback){
   playerModel.deleteMany({},(error) => {
-    console.log(error)
+    if(error)console.log('notremoved',error)
     callback();
   })
 }
 
-function remove(player, callback) {
-  playerModel.deleteOne({_id: player.id}, (error) => {
-    console.log(error)
+function remove(id, callback) {
+  playerModel.deleteOne({_id: id}, (error) => {
+    if(error)console.log('notdeleted',error)
     callback();
   });
 }
@@ -56,8 +58,8 @@ function remove(player, callback) {
 function getOne(id, callback) {
   playerModel.findOne({_id: id}, (err, found) => {
     if(err){
-      console.log(error);
-      callback([]);
+      console.log('notfound',error);
+      callback(null);
     } else {
       callback(found);
     }
@@ -75,7 +77,9 @@ function update(player, callback) {
       sw_angle:player.sw_angle,
       sw_r:player.sw_r,
       hp:player.hp,
+      hpmax:player.hpmax,
       xp:player.xp,
+      lv:player.lv,
     },
     () => {
     callback();

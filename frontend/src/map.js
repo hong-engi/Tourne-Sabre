@@ -47,7 +47,7 @@ class mapConstructor{
     };
 
     deletePlayer(player){
-        axios.delete(`/api/map/player/delete`,player)
+        axios.post(`/api/map/${player.id}/delete`)
             .then(() => axios.get('/api/map/player'))
             .then(response => {
                 this.playerList = response.data;

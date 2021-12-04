@@ -46,8 +46,8 @@ router.delete("/all", (req, res) => {
   });
 })
 
-router.delete("/player/delete", (req, res) => {
-  playerdb.remove(req.body, () => {
+router.delete("/player/:id/delete", (req, res) => {
+  playerdb.remove(req.params.id, () => {
     res.status(200).send();
   });
 });

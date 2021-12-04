@@ -1,7 +1,8 @@
 import {Player,Item} from './object.js'
 import {map} from './map.js'
 var ateItemid = null
-var flag = true
+var killedPlayerid = null
+var flag = 0
 var delflag = true
 function frameUpdate(player,pKeys){
   if(pKeys['w'])player.addSpeed(0,-1);
@@ -19,7 +20,6 @@ function frameUpdate(player,pKeys){
     if(player.trytoeat(item)&&ateItemid != item.id){
       ateItemid = item.id
       item.eaten(player)
-      console.log(player.xp)
       map.ate(item)
     }
   }
@@ -27,14 +27,24 @@ function frameUpdate(player,pKeys){
   for(let i=0;i<map.playerList.length;i++){
     let player2 = Player.schemaPlayer(map.playerList[i])
     if(player.trytohit(player2)){
-      map.damage(player2,5)
+      map.damage(player2,101)
+      //todo : 이거 옮기기
+      if(player2.dead() && killedPlayerid != player2.id){
+        killedPlayerid = player2.id
+        map.kill(player2)
+        player.xpup(50)
+      }
+      //
     }
   }
 
-  if(pKeys['.'] && flag){
-    var p = new Player('Jane Doe',100,100)
-    flag = false
-    map.addPlayer(p)
+  if(pKeys['.']){
+    flag = (flag+1)%50
+    console.log(flag)
+    if(flag==0){
+      var p = new Player('Jane Doe',100,100)
+      map.addPlayer(p)
+    }
   }
   if(pKeys[',']){
     map.addItem()

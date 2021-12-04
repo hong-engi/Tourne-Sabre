@@ -119,7 +119,7 @@ function drawHealthbar(ctx,me,p){
     ctx.strokeStyle = '#77FF77'
     ctx.fillStyle = '#77FF77'
     ctx.lineWidth=2;
-    ctx.fillRect(x-p.r,y+p.r+3,2*p.r*p.hp/100,10)
+    ctx.fillRect(x-p.r,y+p.r+3,2*p.r*p.hp/p.hpmax,10)
     ctx.strokeStyle = '#77FF77'
     ctx.fillStyle = "rgba(0, 0, 0, 0.2)";
     ctx.fillRect(x-p.r,y+p.r+3,2*p.r,10)

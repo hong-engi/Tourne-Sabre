@@ -13,7 +13,9 @@ const playerSchema = new mongoose.Schema({
     sw_h:Number,
     sw_speed:Number,
     hp:Number,
+    hpmax:Number,
     xp:Number,
+    lv:Number,
     color:String,
 });
 const playerModel = mongoose.model("player", playerSchema);
