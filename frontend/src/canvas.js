@@ -2,15 +2,26 @@ import { useRef, useEffect } from 'react'
 import {Player} from './object.js'
 import draw from './mapdraw.js'
 import {map} from './map.js'
-import ReactDOM from 'react-dom'
 import useInterval from '@use-it/interval'
-import {Textbox} from './textbox.js'
 import frameUpdate from './frameUpdater.js'
+import socketIOClient from "socket.io-client";
+
+const socket = socketIOClient("http://localhost:8081", {  
+  cors: {
+  origin: "http://localhost:8081",
+  credentials: true},
+  transports : ['websocket']} 
+);
+
+socket.on("connect", () => {
+  console.log('socket id', socket.id); // x8WIv7-mJelg7on_ALbx
+});
 
 var player = null
 const makePlayer = (name) => {
   player = new Player(name);
   map.addPlayer(player);
+  socket.emit("newplayer",player.id)
 }
 
 var cnt = 0

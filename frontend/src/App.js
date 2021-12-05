@@ -1,12 +1,9 @@
 import './App.css';
 import Canvas from './canvas.js'
+import React,{useEffect} from 'react'
 import {map} from './map.js'
-import React from 'react'
 import {Textbox} from './textbox.js'
-import { makePlayer } from './canvas';
-
 //map.deleteAll()
-
 
 function App() {
 

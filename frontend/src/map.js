@@ -85,7 +85,7 @@ class mapConstructor{
 
     playerUpdateBack(player){
         axios.get(`/api/map/player/${player.id}`)
-        .then((found) => {player.hp = found.data.hp})
+        .then((found) => {if(found && player)player.hp = found.data.hp})
     }
 
     ate(item){

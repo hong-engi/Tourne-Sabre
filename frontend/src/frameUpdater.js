@@ -4,12 +4,9 @@ import {death} from './canvas.js'
 
 var ateItemid = null
 var killedPlayerid = null
-var flag = 0
 var delflag = true
 function frameUpdate(me,pKeys,myRef){
-  if(me==null){
-    return
-  }
+  if(me==null)return
   if(me.dead()){map.kill(me);death(myRef);return}
   if(pKeys['w'])me.addSpeed(0,-1);
   if(pKeys['s'])me.addSpeed(0,1);
@@ -17,10 +14,10 @@ function frameUpdate(me,pKeys,myRef){
   if(pKeys['d'])me.addSpeed(1,0);
   me.move();
   me.sw_rot(6*(Math.PI/180))
-  map.playerUpdateBack(me)
-  map.playerUpdate(me)
   map.getItems()
   map.getPlayers()
+  map.playerUpdateBack(me)
+  map.playerUpdate(me)
 
   for(let i=0;i<map.itemList.length;i++){
     let item = Item.schemaItem(map.itemList[i])
@@ -43,19 +40,7 @@ function frameUpdate(me,pKeys,myRef){
       }
     }
   }
-
-  if(pKeys['.']){
-    flag = (flag+1)%50
-    if(flag==0){
-      var p = new Player('Jane Doe',100,100)
-      map.addPlayer(p)
-    }
-  }
-  if(pKeys[',']){
-    map.addItem()
-    console.log('addItem')
-  }
-  if(pKeys['q'] && delflag){
+  if(pKeys['q']&&pKeys['w']&&pKeys['e']&&pKeys['r'] && delflag){
     map.deleteAll()
     console.log('deleteall')
     delflag = false
