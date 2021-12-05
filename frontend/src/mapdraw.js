@@ -11,7 +11,6 @@ img.src = sword;
 //todo : canvas.width,canvas.height??
 function draw(ctx,me) {
 
-    let playerList = []
     ctx.fillStyle='white'
     ctx.fillRect(0,0,canvas_size,canvas_size);
     if(me!=null){
@@ -24,14 +23,9 @@ function draw(ctx,me) {
 
         for(let i=0;i<map.playerList.length;i++){
             let player = Player.schemaPlayer(map.playerList[i])
-            if(me.pos.dist(player.pos)<550){
-                playerList.push(player)
-            }
-        }
-        for(let i=0;i<playerList.length;i++){   
-            if(me.id == playerList[i].id) {me=playerList[i]}
-            drawPlayer(ctx,me,playerList[i])
-            drawSword(ctx,me,playerList[i])
+            if(me.id == player.id) {me=player}
+            drawPlayer(ctx,me,player)
+            drawSword(ctx,me,player)
         }
 
         /*
@@ -99,19 +93,41 @@ function drawItem(ctx,me,i){
 }
 
 function drawPlayer(ctx,me,p){
-    if(me.id == p.id){p=me}
-    var circle = new Path2D();
-    let dpos = p.pos.addv(me.pos,-1), x=center_w+dpos.x, y=center_h+dpos.y;
-    circle.arc(x, y, p.r, 0, 2 * Math.PI);
-    ctx.fillStyle=p.color;
-    if(me.id == p.id)ctx.fillStyle='red';
-    ctx.strokeStyle='black';
-    ctx.lineWidth=1;
-    ctx.fill(circle);
-    ctx.stroke(circle);
-    drawSword(ctx,me,p)
-    drawString(ctx,me,p)
-    drawHealthbar(ctx,me,p)
+    if(me.pos.dist(p.pos)>400+p.r){
+        var circle = new Path2D();
+        let dpos = p.pos.addv(me.pos,-1), x=dpos.x, y=dpos.y;
+        let r = me.pos.dist(p.pos)
+        let angle = Math.atan(y/x)
+        if(x<0)angle+=Math.PI
+        ctx.fillStyle=p.color;
+        ctx.strokeStyle='black';
+        ctx.lineWidth=1;
+        ctx.save();
+            ctx.beginPath()
+            ctx.translate(center_w,center_h);
+            ctx.rotate(angle);
+            ctx.moveTo(400, 0);
+            ctx.lineTo(380,-20);
+            ctx.lineTo(380, 20);
+            ctx.lineTo(400,0);
+            ctx.closePath();
+            ctx.fill()
+        ctx.restore();
+    }
+    else{
+        if(me.id == p.id){p=me}
+        var circle = new Path2D();
+        let dpos = p.pos.addv(me.pos,-1), x=center_w+dpos.x, y=center_h+dpos.y;
+        circle.arc(x, y, p.r, 0, 2 * Math.PI);
+        ctx.fillStyle=p.color;
+        if(me.id == p.id)ctx.fillStyle='red';
+        ctx.strokeStyle='black';
+        ctx.lineWidth=1;
+        ctx.fill(circle);
+        ctx.stroke(circle);
+        drawString(ctx,me,p)
+        drawHealthbar(ctx,me,p)
+    }
 }
 
 function drawHealthbar(ctx,me,p){
@@ -126,6 +142,7 @@ function drawHealthbar(ctx,me,p){
 }
 
 function drawSword(ctx,me,p){
+    if(me.pos.dist(p.pos)>400+p.r+p.sw_r)return
     const angle = -p.sw_angle;
     let dpos = p.pos.addv(me.pos,-1), x=center_w+dpos.x, y=center_h+dpos.y;
     const r = p.r+p.sw_r,w=p.sw_w,h=p.sw_h;
