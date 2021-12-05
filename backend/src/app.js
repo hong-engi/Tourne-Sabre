@@ -1,4 +1,5 @@
 const express = require("express");
+const cors = require("cors");
 const mongoose = require('mongoose')
 const http = require('http')
 const path = require("path");
@@ -8,7 +9,6 @@ const Object = require("./object.js")
 const itemdb = require("./db/itemdb");
 const playerdb = require("./db/playerdb");
 
-////
 const app2 = express();
 const sockport = 8081;
 const server = http.createServer(app2)
@@ -19,11 +19,7 @@ io.on("connection", (socket) => {
   console.log('socket connected!')
   var pid;
 
-  console.log("New client connected");
-  console.log(socket.id)
-
   socket.on("newplayer", (playerid) =>{
-    console.log('new player',playerid)
     pid = playerid
   })
 
@@ -38,15 +34,16 @@ io.on("connection", (socket) => {
 server.listen(sockport, () => {
   console.log(`Listening on port ${sockport}`);
 });
-////
 
 const app = express();
 const port = 8080;
+const passwd = "Passwordveryhard131072!"
+app.use(cors());
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({
   extended: true
 }));
-mongoose.connect('mongodb://localhost:27017/map', {
+mongoose.connect('mongodb://root:'+passwd+'@ssal.sparcs.org:6561?authSource=admin', {
   useNewUrlParser: true,
   useUnifiedTopology: true
 });

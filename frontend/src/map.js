@@ -1,7 +1,7 @@
 import axios from "axios";
 import {Item} from "./object.js"
 
-const sitetxt = 'https://localhost:8080/'
+const sitetxt = 'http://localhost:8080/'
 
 class mapConstructor{
     constructor(){
@@ -10,30 +10,30 @@ class mapConstructor{
     }
 
     test(){
-        axios.post('api/map/test')
+        axios.post(sitetxt+'map/test')
         console.log('test success')
     }
 
     deleteAll(){
-        axios.delete('api/map/all')
+        axios.delete(sitetxt+'map/all')
         console.log('deleted All')
     }
 
     getItems(){
-        axios.get(`/api/map/item`)
+        axios.get(sitetxt+`map/item`)
         .then(response => {
             this.itemList = response.data;
         })
     }
     getPlayers(){
-        axios.get(`/api/map/player`)
+        axios.get(sitetxt+`map/player`)
         .then(response => {
             this.playerList = response.data;
         })
     }
 
     kill(player){
-        axios.delete(`/api/map/player/${player.id}/kill`)
+        axios.delete(sitetxt+`map/player/${player.id}/kill`)
             .then(() => axios.get('/api/map/player'))
             .then(response => {
                 this.playerList = response.data;
@@ -41,7 +41,7 @@ class mapConstructor{
     };
 
     addPlayer(player){
-        axios.post(`/api/map/player/add`,player)
+        axios.post(sitetxt+`map/player/add`,player)
             .then(() => axios.get('/api/map/player'))
             .then(response => {
                 this.playerList = response.data;
@@ -49,7 +49,7 @@ class mapConstructor{
     };
 
     deletePlayer(player){
-        axios.post(`/api/map/${player.id}/delete`)
+        axios.post(sitetxt+`map/${player.id}/delete`)
             .then(() => axios.get('/api/map/player'))
             .then(response => {
                 this.playerList = response.data;
@@ -59,7 +59,7 @@ class mapConstructor{
     addItem(num = 5){
         for(let i=0;i<num;i++){
             let item = Item.randomItem()
-            axios.post(`/api/map/item/add`,item)
+            axios.post(sitetxt+`map/item/add`,item)
             .then(() => axios.get('/api/map/item'))
             .then(response => {
                 this.itemList = response.data;
@@ -68,7 +68,7 @@ class mapConstructor{
     }
 
     damage(player,dmg){
-        axios.put(`/api/map/player/${player.id}/damage`,{dmg:dmg})
+        axios.put(sitetxt+`map/player/${player.id}/damage`,{dmg:dmg})
             .then(() => axios.get('/api/map/player'))
             .then(response => {
                 this.playerList = response.data;
@@ -76,7 +76,7 @@ class mapConstructor{
     }
 
     playerUpdate(player){
-        axios.post(`/api/map/player/update`,player)
+        axios.post(sitetxt+`map/player/update`,player)
         .then(() => axios.get('/api/map/player'))
         .then(response => {
             this.playerList = response.data;
@@ -84,12 +84,12 @@ class mapConstructor{
     }
 
     playerUpdateBack(player){
-        axios.get(`/api/map/player/${player.id}`)
+        axios.get(sitetxt+`map/player/${player.id}`)
         .then((found) => {if(found && player)player.hp = found.data.hp})
     }
 
     ate(item){
-        axios.post(`/api/map/item/ate`,item)
+        axios.post(sitetxt+`map/item/ate`,item)
             .then(() => axios.get('/api/map/item'))
             .then(response => {
                 this.itemList = response.data;

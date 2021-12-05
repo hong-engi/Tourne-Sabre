@@ -3,19 +3,18 @@ import Canvas from './canvas.js'
 import React,{useEffect} from 'react'
 import {map} from './map.js'
 import {Textbox} from './textbox.js'
-//map.deleteAll()
 
 function App() {
 
-  const myRef = React.useRef({})
+  const myref = React.useRef({})
 
   return (
     <body className = "center">
       <div className = "above" id = 'entername'>
-        <Textbox myRef = {myRef}/>
+        <Textbox myref = {myref}/>
       </div>
       <header className="App-header">
-        <Canvas myRef = {myRef} id="gameboard" width="1000" height="1000"/>
+        <Canvas myref = {myref} id="gameboard" width="1000" height="1000"/>
       </header>
     </body>
   );

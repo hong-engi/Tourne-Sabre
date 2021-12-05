@@ -5,9 +5,9 @@ import {death} from './canvas.js'
 var ateItemid = null
 var killedPlayerid = null
 var delflag = true
-function frameUpdate(me,pKeys,myRef){
+function frameUpdate(me,pKeys,myref){
   if(me==null)return
-  if(me.dead()){map.kill(me);death(myRef);return}
+  if(me.dead()){map.kill(me);death(myref);return}
   if(pKeys['w'])me.addSpeed(0,-1);
   if(pKeys['s'])me.addSpeed(0,1);
   if(pKeys['a'])me.addSpeed(-1,0);
@@ -32,7 +32,6 @@ function frameUpdate(me,pKeys,myRef){
     let player = Player.schemaPlayer(map.playerList[i])
     if(me.trytohit(player)){
       let dmg = me.lv+5
-      //todo : 이거 옮기기
       map.damage(player,dmg)
       if(player.dead() && killedPlayerid != player.id){
         killedPlayerid = player.id

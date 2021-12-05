@@ -13,10 +13,6 @@ const socket = socketIOClient("http://localhost:8081", {
   transports : ['websocket']} 
 );
 
-socket.on("connect", () => {
-  console.log('socket id', socket.id); // x8WIv7-mJelg7on_ALbx
-});
-
 var player = null
 const makePlayer = (name) => {
   player = new Player(name);
@@ -24,10 +20,9 @@ const makePlayer = (name) => {
   socket.emit("newplayer",player.id)
 }
 
-var cnt = 0
-function death(myRef){
+function death(myref){
   player=null
-  myRef.current.appearThis()
+  myref.current.appearThis()
 }
 
 const Canvas = props => {
@@ -52,17 +47,15 @@ const Canvas = props => {
     };
   }, []);
 
-  useInterval(()=>{if(player)frameUpdate(player,pressedKeys,props.myRef);},1000/fps)
+  useInterval(()=>{if(player)frameUpdate(player,pressedKeys,props.myref);},1000/fps)
 
   useEffect(() => {
   
     const canvas = canvasRef.current
     const ctx = canvas.getContext('2d')
-    let frameCount = 0
     let animationFrameId
     
     const render = () => {
-      frameCount++;
       draw(ctx, player)
       animationFrameId = window.requestAnimationFrame(render)
     }

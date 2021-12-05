@@ -6,7 +6,7 @@ import Divider from  '@mui/material/Divider';
 import {TextField} from "@material-ui/core"
 import {makePlayer} from "./canvas.js"
 
-export function Textbox({myRef}){
+export function Textbox({myref}){
 
   const [name, setName] = useState('')
 
@@ -25,7 +25,7 @@ export function Textbox({myRef}){
     setVanishFlag(false)
   }
 
-  myRef.current.appearThis = appearThis
+  myref.current.appearThis = appearThis
   
   return (<div>{ !vanishFlag && <Box
       component="form"

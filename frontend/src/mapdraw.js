@@ -8,7 +8,6 @@ const center_w = canvas_size/2;
 var img = new Image();
 img.src = sword; 
 
-//todo : canvas.width,canvas.height??
 function draw(ctx,me) {
 
     ctx.fillStyle='white'
@@ -27,34 +26,6 @@ function draw(ctx,me) {
             drawPlayer(ctx,me,player)
             drawSword(ctx,me,player)
         }
-
-        /*
-        ctx.fillStyle = 'purple'
-        let sp = me.sw_pos()
-        var circle = new Path2D();
-        circle.arc(center_w+sp.x-me.pos.x, center_h+sp.y-me.pos.y, 3, 0, 2 * Math.PI);
-        circle.arc(center_w-me.pos.x, center_h-me.pos.y, 3, 0, 2 * Math.PI);
-        ctx.fill(circle);
-        */
-        /*
-        let w = me.sw_w/2;
-        let h = me.sw_h/2;
-        let alpha = Math.atan(w/h)
-        let beta = me.sw_angle-alpha
-        let r = Math.pow(w*w+h*h,0.5)
-        var dir = [new Pos(0,-r).rot(new Pos(0,0),beta),
-            new Pos(0,-r).rot(new Pos(0,0),beta+2*alpha)]
-        for(let i=0;i<4;i++){
-            let xx = new Path2D();
-            let p1 = sp.addv(dir[0]);
-            ctx.fillStyle = 'blue'
-            xx.arc(center_w+p1.x-me.pos.x, center_h+p1.y-me.pos.y, 3, 0, 2 * Math.PI);
-            ctx.fill(xx);
-            let tmp = dir[0];
-            dir[0] = new Pos(0,0).addv(dir[1],-1);
-            dir[1] = tmp;
-        }
-        */
     }
     defaultMap(ctx)
 
