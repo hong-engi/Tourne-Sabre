@@ -1,74 +1,37 @@
-import { useRef, useEffect } from 'react'
-import {Player} from './object.js'
+import { useEffect, useRef } from 'react'
 import draw from './mapdraw.js'
-import {map} from './map.js'
-import useInterval from '@use-it/interval'
-import frameUpdate from './frameUpdater.js'
-import socketIOClient from "socket.io-client";
 
-const socket = socketIOClient("http://localhost:8081", {  
-  cors: {
-  origin: "http://localhost:8081",
-  credentials: true},
-  transports : ['websocket']} 
-);
-
-var player = null
-const makePlayer = (name) => {
-  player = new Player(name);
-  map.addPlayer(player);
-  socket.emit("newplayer",player.id)
-}
-
-function death(myref){
-  player=null
-  myref.current.appearThis()
-}
-
-const Canvas = props => {
+export default function Canvas({ game, ...props }) {
   const canvasRef = useRef(null)
-  const fps = 30;
-  var pressedKeys = {};
-
-  function handleKeyDown(event){
-    pressedKeys[event.key] = true;
-  } 
-  function handleKeyUp(event){
-    delete pressedKeys[event.key]
-  } 
 
   useEffect(() => {
-    window.addEventListener('keydown', handleKeyDown);
-    window.addEventListener('keyup',handleKeyUp)
-    return () => {
-      console.log('removing keyboard')
-      window.removeEventListener('keydown', handleKeyDown);
-      window.removeEventListener('keyup',handleKeyUp)
-    };
-  }, []);
+    const keyDown = event => game.setKey(event.key, true)
+    const keyUp = event => game.setKey(event.key, false)
+    const releaseKeys = () => game.setKeys(0)
 
-  useInterval(()=>{if(player)frameUpdate(player,pressedKeys,props.myref);},1000/fps)
+    window.addEventListener('keydown', keyDown)
+    window.addEventListener('keyup', keyUp)
+    window.addEventListener('blur', releaseKeys)
+    document.addEventListener('visibilitychange', releaseKeys)
 
-  useEffect(() => {
-  
-    const canvas = canvasRef.current
-    const ctx = canvas.getContext('2d')
-    let animationFrameId
-    
-    const render = () => {
-      draw(ctx, player)
-      animationFrameId = window.requestAnimationFrame(render)
+    const ctx = canvasRef.current.getContext('2d')
+    let frame
+    if (ctx) {
+      const render = now => {
+        draw(ctx, game.renderState(now))
+        frame = window.requestAnimationFrame(render)
+      }
+      frame = window.requestAnimationFrame(render)
     }
 
-    render()
-
     return () => {
-      window.cancelAnimationFrame(animationFrameId)
+      window.removeEventListener('keydown', keyDown)
+      window.removeEventListener('keyup', keyUp)
+      window.removeEventListener('blur', releaseKeys)
+      document.removeEventListener('visibilitychange', releaseKeys)
+      window.cancelAnimationFrame(frame)
     }
-  }, [draw])
-  
-  return <canvas ref={canvasRef} {...props}/>
+  }, [game])
+
+  return <canvas ref={canvasRef} {...props} />
 }
-
-export default Canvas
-export {makePlayer,death}

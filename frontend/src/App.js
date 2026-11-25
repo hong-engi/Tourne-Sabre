@@ -1,24 +1,23 @@
-import './App.css';
+import { useEffect, useState } from 'react'
+import './App.css'
 import Canvas from './canvas.js'
-import React,{useEffect} from 'react'
-import {map} from './map.js'
-import {Textbox} from './textbox.js'
+import GameClient from './gameClient.js'
+import { Textbox } from './textbox.js'
 
-function App() {
+export default function App() {
+  const [game] = useState(() => new GameClient())
+  const [status, setStatus] = useState({ phase: 'connecting', message: '' })
 
-  const myref = React.useRef({})
+  useEffect(() => game.connect(setStatus), [game])
 
   return (
-    <body className = "center">
-      <div className = "above" id = 'entername'>
-        <Textbox myref = {myref}/>
+    <div className="center">
+      <div className="above" id="entername">
+        <Textbox status={status} onJoin={name => game.join(name)} />
       </div>
       <header className="App-header">
-        <Canvas myref = {myref} id="gameboard" width="1000" height="1000"/>
+        <Canvas game={game} id="gameboard" width="1000" height="1000" />
       </header>
-    </body>
-  );
+    </div>
+  )
 }
-
-
-export default App;

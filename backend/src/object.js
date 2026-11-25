@@ -261,4 +261,4 @@ class Item{
     }
 }
 
-module.exports.Item = Item
+module.exports = { Item, Player }

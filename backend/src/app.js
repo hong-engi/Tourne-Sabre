@@ -1,70 +1,62 @@
-const express = require("express");
-const cors = require("cors");
-const mongoose = require('mongoose')
+const express = require('express')
 const http = require('http')
-const path = require("path");
-const bodyParser = require("body-parser");
-const mapRouter = require("./routes/map");
-const Object = require("./object.js")
-const itemdb = require("./db/itemdb");
-const playerdb = require("./db/playerdb");
+const path = require('path')
+const { Server } = require('socket.io')
+const { Game } = require('./game')
 
-const app2 = express();
-const sockport = 8081;
-const server = http.createServer(app2)
-const socketIo = require("socket.io")
-const io = socketIo(server)
+const port = process.env.PORT || 8080
+const app = express()
+app.use(express.static(path.join(__dirname, '../../frontend/build')))
 
-io.on("connection", (socket) => {
-  console.log('socket connected!')
-  var pid;
+const server = http.createServer(app)
+const io = new Server(server, {
+  transports: ['websocket'],
+  maxHttpBufferSize: 16 * 1024,
+})
+const game = new Game()
+const room = 'players'
+const ticksPerSecond = 30
+const ticksPerSnapshot = 2
 
-  socket.on("newplayer", (playerid) =>{
-    pid = playerid
+io.on('connection', (socket) => {
+  socket.on('game:join', (payload, reply) => {
+    if (typeof reply !== 'function') return
+
+    const name = payload?.name
+    if (typeof name !== 'string' || name.length > 40) {
+      reply({ error: 'Enter a name with up to 40 characters.' })
+      return
+    }
+    const initialState = game.join(socket.id, name.trim())
+    socket.join(room)
+    reply(initialState)
   })
 
-  socket.on("disconnect", () => {
-    console.log("Client disconnected");
-    playerdb.remove(pid, () => {});
-  });
+  socket.on('game:input', (payload) => {
+    game.setInput(socket.id, payload)
+  })
 
+  socket.on('disconnect', () => {
+    game.leave(socket.id)
+  })
+})
 
-});
-
-server.listen(sockport, () => {
-  console.log(`Listening on port ${sockport}`);
-});
-
-const app = express();
-const port = 8080;
-const passwd = "Passwordveryhard131072!"
-app.use(cors());
-app.use(bodyParser.json());
-app.use(bodyParser.urlencoded({
-  extended: true
-}));
-mongoose.connect('mongodb://root:'+passwd+'@ssal.sparcs.org:6561?authSource=admin', {
-  useNewUrlParser: true,
-  useUnifiedTopology: true
-});
-
-const db = mongoose.connection;
-
-db.once('open', function() {
-  playerdb.removeAll(() => {});
-  itemdb.removeAll(() => {});
-  for(let i=0;i<1000;i++){
-    itemdb.add(Object.Item.randomItem(),()=>{})
+setInterval(() => {
+  if (game.size === 0) return
+  const { changedItems, deaths } = game.step()
+  for (const id of deaths) {
+    const socket = io.sockets.sockets.get(id)
+    if (socket) {
+      socket.leave(room)
+      socket.emit('game:death', { id, tick: game.tick })
+    }
   }
-  console.log("DB ready!");
-});
+  if (changedItems.length) io.to(room).emit('game:items', changedItems)
+  if (game.tick % ticksPerSnapshot === 0) {
+    io.to(room).volatile.emit('game:state', game.snapshot())
+  }
+}, 1000 / ticksPerSecond)
 
-app.use("/map", mapRouter);
-
-app.get("/", (req, res) => {
-  res.status(418).send("Hi");
-});
-
-app.listen(port,() => {
-  console.log(`Listening on port ${port}`);
+server.listen(port, () => {
+  console.log(`Listening on port ${port}`)
 })

@@ -1,6 +1,4 @@
 import sword from './sword.png'
-import {map} from './map.js'
-import {Pos, Player, Item} from './object.js'
 const canvas_size = 1000;
 const center_h = canvas_size/2;
 const center_w = canvas_size/2;
@@ -8,32 +6,29 @@ const center_w = canvas_size/2;
 var img = new Image();
 img.src = sword; 
 
-function draw(ctx,me) {
-
-    ctx.fillStyle='white'
-    ctx.fillRect(0,0,canvas_size,canvas_size);
-    if(me!=null){
-        for(let i=0;i<map.itemList.length;i++){
-            let item = Item.schemaItem(map.itemList[i])
-            if(me.pos.dist(item.pos)<550){
-                drawItem(ctx,me,item)
-            }
+function draw(ctx, { me, players, items }) {
+    ctx.fillStyle = 'white'
+    ctx.fillRect(0, 0, canvas_size, canvas_size)
+    if (me) {
+        for (const item of items) {
+            const dx = item.pos.x - me.pos.x
+            const dy = item.pos.y - me.pos.y
+            if (dx * dx + dy * dy < 550 * 550) drawItem(ctx, me, item)
         }
 
-        for(let i=0;i<map.playerList.length;i++){
-            let player = Player.schemaPlayer(map.playerList[i])
-            if(me.id == player.id) {me=player}
-            drawPlayer(ctx,me,player)
-            drawSword(ctx,me,player)
+        drawPlayer(ctx, me, me)
+        drawSword(ctx, me, me)
+        for (const player of players) {
+            drawPlayer(ctx, me, player)
+            drawSword(ctx, me, player)
         }
     }
     defaultMap(ctx)
 
-    if(me!=null){
-        ctx.font = '20px Dosis-Bold';
+    if (me) {
+        ctx.font = '20px Dosis-Bold'
         ctx.fillStyle = 'green'
-        let text = '('+String(Math.round(me.pos.x))+','+String(Math.round(me.pos.y))+')'
-        ctx.fillText(text,100,200)
+        ctx.fillText('(' + Math.round(me.pos.x) + ',' + Math.round(me.pos.y) + ')', 100, 200)
     }
 }
 
@@ -65,9 +60,7 @@ function drawItem(ctx,me,i){
 
 function drawPlayer(ctx,me,p){
     if(me.pos.dist(p.pos)>400+p.r){
-        var circle = new Path2D();
         let dpos = p.pos.addv(me.pos,-1), x=dpos.x, y=dpos.y;
-        let r = me.pos.dist(p.pos)
         let angle = Math.atan(y/x)
         if(x<0)angle+=Math.PI
         ctx.fillStyle=p.color;
@@ -86,12 +79,11 @@ function drawPlayer(ctx,me,p){
         ctx.restore();
     }
     else{
-        if(me.id == p.id){p=me}
-        var circle = new Path2D();
+        const circle = new Path2D();
         let dpos = p.pos.addv(me.pos,-1), x=center_w+dpos.x, y=center_h+dpos.y;
         circle.arc(x, y, p.r, 0, 2 * Math.PI);
         ctx.fillStyle=p.color;
-        if(me.id == p.id)ctx.fillStyle='red';
+        if(me.id === p.id)ctx.fillStyle='red';
         ctx.strokeStyle='black';
         ctx.lineWidth=1;
         ctx.fill(circle);
@@ -127,7 +119,7 @@ function drawSword(ctx,me,p){
 function drawString(ctx,me,p){
     let dpos = p.pos.addv(me.pos,-1), x=center_w+dpos.x, y=center_h+dpos.y;
     ctx.fillStyle='black';
-    if(me.id == p.id)ctx.fillStyle='white';
+    if(me.id === p.id)ctx.fillStyle='white';
     ctx.font = String(p.r*15/25)+'px Dosis-Bold';
     let text = p.name
     let width = ctx.measureText(text).width;
