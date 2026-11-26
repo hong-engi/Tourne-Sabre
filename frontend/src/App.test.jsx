@@ -25,7 +25,7 @@ test('joins through the socket and returns to name entry on death', () => {
 
   fireEvent.change(screen.getByLabelText('Enter name'), { target: { value: 'P1' } })
   fireEvent.click(screen.getByRole('button', { name: 'ENTER' }))
-  expect(socket.emit).toHaveBeenCalledWith('game:join', { name: 'P1' }, expect.any(Function))
+  expect(socket.emit).toHaveBeenCalledWith('game:join', { name: 'P1', protocol: 2 }, expect.any(Function))
 
   const reply = socket.emit.mock.calls[0][2]
   act(() => reply(null, {

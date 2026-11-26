@@ -45,12 +45,13 @@ test('a collected item moves between grid cells and keeps its ID', t => {
   game.itemGrid.add(item)
   t.mock.method(item, 'respawn', () => { item.pos = { x: 2000, y: -2000 } })
 
-  const { changedItems } = game.step()
+  const { changedItems, vitals } = game.step()
   assert.deepEqual(changedItems.map(({ _id, x, y }) => ({ _id, x, y })),
     [{ _id: item.id, x: 2000, y: -2000 }])
   assert.deepEqual([...game.itemGrid.nearby({ x: 0, y: 0 }, 40)], [])
   assert.deepEqual([...game.itemGrid.nearby(item.pos, 40)], [item])
   assert.equal(game.players.get('one').player.xp, 10)
+  assert.deepEqual(vitals, [[game.playerProfile('one').handle, 25.199, 100, 100, 1]])
 })
 
 test('simultaneous lethal hits remove both players on the same tick', () => {
@@ -68,4 +69,31 @@ test('simultaneous lethal hits remove both players on the same tick', () => {
 
   assert.deepEqual(new Set(game.step().deaths), new Set(['one', 'two']))
   assert.equal(game.size, 0)
+})
+
+test('compact frames carry all positions and only the requested movement correction', () => {
+  const game = new Game()
+  game.itemGrid = new SpatialGrid(128)
+  game.join('one', 'One')
+  game.step()
+  const join = game.join('two', 'Two', true)
+  const [one, two] = join.profiles
+  assert.equal(two.spawnTick, game.tick)
+  assert.notEqual(two.handle, one.handle)
+  assert.deepEqual(join.frame, [
+    game.tick,
+    [[one.handle, 0, 0], [two.handle, 300, 0]],
+    [0, 0, -1],
+  ])
+  assert.equal(join.players, undefined)
+
+  game.setInput('one', { keys: movementKeys.d, seq: 13 })
+  game.step()
+  assert.deepEqual(game.correction('one'), [0.933, 0, 13])
+  assert.deepEqual(game.correction('two'), [0, 0, -1])
+
+  assert.equal(game.leave('two'), two.handle)
+  const rejoin = game.join('two', 'Two again', true)
+  assert.notEqual(rejoin.profiles[1].handle, two.handle)
+  assert.ok(!rejoin.frame[1].some(([handle]) => handle === two.handle))
 })

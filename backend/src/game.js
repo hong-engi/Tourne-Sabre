@@ -39,6 +39,24 @@ function playerState({ player, inputSeq }) {
   }
 }
 
+function profile(entry) {
+  const { player, handle, spawnTick } = entry
+  return {
+    handle,
+    spawnTick,
+    _id: player.id,
+    name: player.name,
+    color: player.color,
+    sw_r: player.sw_r,
+    sw_w: player.sw_w,
+    sw_h: player.sw_h,
+    r: round(player.r),
+    hp: player.hp,
+    hpmax: player.hpmax,
+    lv: player.lv,
+  }
+}
+
 function itemState(item) {
   return {
     _id: item.id,
@@ -52,6 +70,7 @@ function itemState(item) {
 export class Game {
   constructor() {
     this.tick = 0
+    this.nextHandle = 1
     this.players = new Map()
     this.itemGrid = new SpatialGrid(128)
     this.items = Array.from({ length: itemCount }, (_, id) => {
@@ -65,12 +84,43 @@ export class Game {
     return this.players.size
   }
 
-  join(id, name) {
+  join(id, name, compact = false) {
     if (!this.players.has(id)) {
       const { x, y } = this.spawnPosition()
-      this.players.set(id, { player: new Player(id, name, x, y), keys: 0, seq: -1, inputSeq: -1 })
+      this.players.set(id, {
+        player: new Player(id, name, x, y),
+        handle: this.nextHandle++,
+        spawnTick: this.tick,
+        keys: 0,
+        seq: -1,
+        inputSeq: -1,
+      })
     }
-    return { id, ...this.snapshot(), items: this.items.map(itemState) }
+    const items = this.items.map(itemState)
+    if (compact) {
+      return {
+        id,
+        items,
+        profiles: Array.from(this.players.values(), profile),
+        frame: [this.tick, this.poses(), this.correction(id)],
+      }
+    }
+    return { id, ...this.snapshot(), items }
+  }
+
+  playerProfile(id) {
+    return profile(this.players.get(id))
+  }
+
+  poses() {
+    return Array.from(this.players.values(), ({ player, handle }) => [
+      handle, round(player.pos.x), round(player.pos.y),
+    ])
+  }
+
+  correction(id) {
+    const { player, inputSeq } = this.players.get(id)
+    return [round(player.speed.x), round(player.speed.y), inputSeq]
   }
 
   spawnPosition() {
@@ -88,7 +138,9 @@ export class Game {
   }
 
   leave(id) {
+    const handle = this.players.get(id)?.handle
     this.players.delete(id)
+    return handle
   }
 
   setInput(id, payload) {
@@ -109,6 +161,7 @@ export class Game {
   step() {
     this.tick++
     const changedItems = new Map()
+    const changedPlayers = new Set()
     for (const entry of this.players.values()) {
       const { player, keys } = entry
       player.step(keys)
@@ -120,6 +173,7 @@ export class Game {
         if (!player.canCollect(item)) continue
         this.itemGrid.remove(item)
         player.addExperience(item.xp)
+        changedPlayers.add(entry)
         item.respawn()
         this.itemGrid.add(item)
         changedItems.set(item.id, itemState(item))
@@ -127,20 +181,36 @@ export class Game {
     }
 
     const defeated = new Map()
-    for (const { player: attacker } of this.players.values()) {
+    for (const attackerEntry of this.players.values()) {
+      const attacker = attackerEntry.player
       const sword = attacker.swordHitbox()
-      for (const { player: target } of this.players.values()) {
+      for (const targetEntry of this.players.values()) {
+        const target = targetEntry.player
         if (target === attacker || target.hp === 0 || !swordHits(sword, target)) continue
         target.damage(attacker.lv + 5)
-        if (target.hp === 0) defeated.set(target.id, attacker)
+        changedPlayers.add(targetEntry)
+        if (target.hp === 0) defeated.set(target.id, attackerEntry)
       }
     }
 
     // Remove defeated players after all attacks so same-tick hits can land.
-    for (const [id, attacker] of defeated) {
-      this.leave(id)
-      if (attacker.hp > 0) attacker.addExperience(50)
+    const removedHandles = []
+    for (const [id, attackerEntry] of defeated) {
+      removedHandles.push(this.leave(id))
+      if (attackerEntry.player.hp > 0) {
+        attackerEntry.player.addExperience(50)
+        changedPlayers.add(attackerEntry)
+      }
     }
-    return { changedItems: Array.from(changedItems.values()), deaths: Array.from(defeated.keys()) }
+    const vitals = []
+    for (const { player, handle } of changedPlayers) {
+      if (player.hp > 0) vitals.push([handle, round(player.r), player.hp, player.hpmax, player.lv])
+    }
+    return {
+      changedItems: Array.from(changedItems.values()),
+      deaths: Array.from(defeated.keys()),
+      removedHandles,
+      vitals,
+    }
   }
 }

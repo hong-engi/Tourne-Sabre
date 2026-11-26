@@ -1,9 +1,12 @@
 import { io } from 'socket.io-client'
+import { compactStateProtocol } from '../../shared/gameProtocol.mjs'
 import { tickMs, swordStep, movePlayer, movementKeys } from '../../shared/movement.mjs'
 import SpatialGrid from '../../shared/spatialGrid.mjs'
 import { itemViewRadius } from './mapdraw.js'
 
 const interpolationMs = 2 * tickMs
+const tau = 2 * Math.PI
+
 function interpolatePlayer(before, after, fraction) {
   const turn = after.sw_angle - before.sw_angle
   const shortestTurn = Math.atan2(Math.sin(turn), Math.cos(turn))
@@ -35,6 +38,12 @@ export default class GameClient {
       if (!socket.active) socket.connect()
     })
     socket.on('game:state', snapshot => this.receiveState(snapshot))
+    socket.on('game:frame', frame => this.receiveFrame(frame))
+    socket.on('game:profile', profile => this.profiles.set(profile.handle, profile))
+    socket.on('game:vitals', vitals => this.receiveVitals(vitals))
+    socket.on('game:remove', handles => {
+      for (const handle of handles) this.profiles.delete(handle)
+    })
     socket.on('game:items', items => {
       if (this.id !== null) this.receiveItems(items)
     })
@@ -60,6 +69,7 @@ export default class GameClient {
     this.id = null
     this.joinAttempt = null
     this.items = new Map()
+    this.profiles = new Map()
     this.itemGrid = new SpatialGrid(256)
     this.snapshots = []
     this.keys = 0
@@ -75,7 +85,7 @@ export default class GameClient {
     const attempt = {}
     this.joinAttempt = attempt
     this.status('joining')
-    socket.timeout(4000).emit('game:join', { name }, (timeout, result) => {
+    socket.timeout(4000).emit('game:join', { name, protocol: compactStateProtocol }, (timeout, result) => {
       if (this.socket !== socket || this.joinAttempt !== attempt || !socket.connected) return
       this.joinAttempt = null
       if (timeout || result?.error || !result?.id) {
@@ -85,7 +95,12 @@ export default class GameClient {
 
       this.id = result.id
       this.receiveItems(result.items)
-      this.receiveState(result)
+      if (result.frame) {
+        for (const profile of result.profiles) this.profiles.set(profile.handle, profile)
+        this.receiveFrame(result.frame)
+      } else {
+        this.receiveState(result)
+      }
       this.status('playing')
     })
   }
@@ -112,6 +127,34 @@ export default class GameClient {
     this.advance(performance.now())
     this.keys = keys
     this.socket.emit('game:input', { keys, seq: ++this.seq })
+  }
+
+  receiveVitals(vitals) {
+    for (const [handle, r, hp, hpmax, lv] of vitals) {
+      const profile = this.profiles.get(handle)
+      if (profile) Object.assign(profile, { r, hp, hpmax, lv })
+    }
+  }
+
+  receiveFrame([tick, poses, correction]) {
+    if (this.id === null) return
+    const players = []
+    for (const [handle, x, y] of poses) {
+      const profile = this.profiles.get(handle)
+      if (!profile) continue
+      const player = {
+        ...profile,
+        x,
+        y,
+        sw_angle: (-swordStep * (tick - profile.spawnTick)) % tau,
+      }
+      if (player._id === this.id) {
+        const [vx, vy, inputSeq] = correction
+        Object.assign(player, { vx, vy, inputSeq })
+      }
+      players.push(player)
+    }
+    this.receiveState({ tick, players })
   }
 
   receiveState({ tick, players }) {
