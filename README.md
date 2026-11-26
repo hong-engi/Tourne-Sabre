@@ -19,6 +19,6 @@ Open `http://localhost:8080`. The build flag supports the repository's webpack 4
 
 - The Node.js server runs a 30 Hz simulation in memory. It owns movement, the sword, collisions, HP, experience, and item respawns. A spatial grid limits item collision checks to nearby cells.
 - The browser opens one Socket.IO WebSocket. It sends the key mask and a sequence number when the pressed keys change. The server applies the latest mask at each tick.
-- The server streams player snapshots about 15 times per second. It can skip a stale snapshot when the transport is busy. Joining sends the initial world state, and subsequent item messages contain only items that changed.
-- The browser predicts local movement and corrects its position from server snapshots. Other players are interpolated behind a 100 ms buffer. The canvas renders independently of the network.
+- The server streams player snapshots once per simulation tick (about 30 times per second). It can skip a stale snapshot when the transport is busy. Joining sends the initial world state, and subsequent item messages contain only items that changed.
+- The browser predicts local movement and corrects its position from server snapshots. Other players are interpolated with a two-tick buffer (about 67 ms). The canvas renders independently of the network.
 - Match state is local to a single server process and resets on restart. Disconnect removes the player's character. After reconnecting, a player can use the entry form to start a new character.

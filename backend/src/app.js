@@ -16,7 +16,6 @@ const io = new Server(server, {
 const game = new Game()
 const room = 'players'
 const ticksPerSecond = 30
-const ticksPerSnapshot = 2
 
 io.on('connection', (socket) => {
   socket.on('game:join', (payload, reply) => {
@@ -52,9 +51,7 @@ setInterval(() => {
     }
   }
   if (changedItems.length) io.to(room).emit('game:items', changedItems)
-  if (game.tick % ticksPerSnapshot === 0) {
-    io.to(room).volatile.emit('game:state', game.snapshot())
-  }
+  io.to(room).volatile.emit('game:state', game.snapshot())
 }, 1000 / ticksPerSecond)
 
 server.listen(port, () => {

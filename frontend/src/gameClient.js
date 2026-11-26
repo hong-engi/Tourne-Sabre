@@ -2,7 +2,7 @@ import { io } from 'socket.io-client'
 import { Pos, PredictedMovement } from './object.js'
 
 const tickMs = 1000 / 30
-const interpolationMs = 100
+const interpolationMs = 2 * tickMs
 const swordStep = Math.PI / 30
 const keyBits = new Map([['w', 1], ['s', 2], ['a', 4], ['d', 8]])
 
