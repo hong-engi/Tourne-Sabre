@@ -1,21 +1,33 @@
-const { Item, Player } = require('./object')
+import { distanceSquared, Item, maxItemRadius, Player, swordHits } from './object.js'
+import { movementMask } from '../../shared/movement.mjs'
+import SpatialGrid from '../../shared/spatialGrid.mjs'
 
 const itemCount = 1000
-const cellSize = 128
-const maxItemRadius = 12
 const spawnClearance = 225
-const swordRotation = 6 * Math.PI / 180
+const spawnPositions = [{ x: 0, y: 0 }]
+for (const distance of [300, 600, 900]) {
+  for (let i = 0; i < 8; i++) {
+    const angle = i * Math.PI / 4
+    spawnPositions.push({
+      x: Math.round(distance * Math.cos(angle)),
+      y: Math.round(distance * Math.sin(angle)),
+    })
+  }
+}
 
-function playerState(player, inputSeq) {
+// Keep subpixel precision without transmitting all floating-point digits.
+const round = value => Math.round(value * 1000) / 1000
+
+function playerState({ player, inputSeq }) {
   return {
     _id: player.id,
     name: player.name,
-    x: player.pos.x,
-    y: player.pos.y,
-    vx: player.speed.x,
-    vy: player.speed.y,
-    r: player.r,
-    sw_angle: player.sw_angle,
+    x: round(player.pos.x),
+    y: round(player.pos.y),
+    vx: round(player.speed.x),
+    vy: round(player.speed.y),
+    r: round(player.r),
+    sw_angle: round(player.sw_angle),
     sw_r: player.sw_r,
     sw_w: player.sw_w,
     sw_h: player.sw_h,
@@ -30,25 +42,23 @@ function playerState(player, inputSeq) {
 function itemState(item) {
   return {
     _id: item.id,
-    x: item.pos.x,
-    y: item.pos.y,
+    x: round(item.pos.x),
+    y: round(item.pos.y),
     color: item.color,
     r: item.r,
   }
 }
 
-class Game {
+export class Game {
   constructor() {
     this.tick = 0
     this.players = new Map()
-    this.items = new Map()
-    this.itemCells = new Map()
-    while (this.items.size < itemCount) {
-      const item = Item.randomItem()
-      if (this.items.has(item.id)) continue
-      this.items.set(item.id, item)
-      this.addToCell(item)
-    }
+    this.itemGrid = new SpatialGrid(128)
+    this.items = Array.from({ length: itemCount }, (_, id) => {
+      const item = new Item(String(id))
+      this.itemGrid.add(item)
+      return item
+    })
   }
 
   get size() {
@@ -57,31 +67,24 @@ class Game {
 
   join(id, name) {
     if (!this.players.has(id)) {
-      const player = this.spawn(name)
-      player.id = id
-      this.players.set(id, { player, keys: 0, seq: -1, inputSeq: -1 })
+      const { x, y } = this.spawnPosition()
+      this.players.set(id, { player: new Player(id, name, x, y), keys: 0, seq: -1, inputSeq: -1 })
     }
-    return { id, ...this.snapshot(), items: Array.from(this.items.values(), itemState) }
+    return { id, ...this.snapshot(), items: this.items.map(itemState) }
   }
 
-  spawn(name) {
-    const isClear = (x, y) => {
+  spawnPosition() {
+    for (const position of spawnPositions) {
+      let clear = true
       for (const { player } of this.players.values()) {
-        if (Math.hypot(player.pos.x - x, player.pos.y - y) < spawnClearance) return false
+        if (distanceSquared(player.pos, position) < spawnClearance ** 2) {
+          clear = false
+          break
+        }
       }
-      return true
+      if (clear) return position
     }
-
-    if (isClear(0, 0)) return new Player(name)
-    for (const distance of [300, 600, 900]) {
-      for (let i = 0; i < 8; i++) {
-        const angle = i * Math.PI / 4
-        const x = Math.round(distance * Math.cos(angle))
-        const y = Math.round(distance * Math.sin(angle))
-        if (isClear(x, y)) return new Player(name, x, y)
-      }
-    }
-    return new Player(name)
+    return spawnPositions[0]
   }
 
   leave(id) {
@@ -93,96 +96,51 @@ class Game {
     if (!entry || !payload) return
 
     const { keys, seq } = payload
-    if (!Number.isInteger(keys) || keys < 0 || keys > 15) return
+    if (!Number.isInteger(keys) || keys < 0 || keys > movementMask) return
     if (!Number.isSafeInteger(seq) || seq <= entry.seq) return
     entry.keys = keys
     entry.seq = seq
   }
 
   snapshot() {
-    return {
-      tick: this.tick,
-      players: Array.from(this.players.values(), ({ player, inputSeq }) => playerState(player, inputSeq)),
-    }
+    return { tick: this.tick, players: Array.from(this.players.values(), playerState) }
   }
 
   step() {
-    this.tick += 1
+    this.tick++
     const changedItems = new Map()
     for (const entry of this.players.values()) {
       const { player, keys } = entry
-      const horizontal = Number(Boolean(keys & 8)) - Number(Boolean(keys & 4))
-      const vertical = Number(Boolean(keys & 2)) - Number(Boolean(keys & 1))
-      player.addSpeed(horizontal, vertical)
-      player.move()
-      player.sw_rot(swordRotation)
+      player.step(keys)
       entry.inputSeq = entry.seq
 
-      for (const item of this.nearbyItems(player)) {
-        if (!player.trytoeat(item)) continue
-        this.removeFromCell(item)
-        item.eaten(player)
-        this.addToCell(item)
+      // A respawn can update a cell being queried, so take the candidates first.
+      const nearbyItems = Array.from(this.itemGrid.nearby(player.pos, player.r + maxItemRadius))
+      for (const item of nearbyItems) {
+        if (!player.canCollect(item)) continue
+        this.itemGrid.remove(item)
+        player.addExperience(item.xp)
+        item.respawn()
+        this.itemGrid.add(item)
         changedItems.set(item.id, itemState(item))
       }
     }
 
-    const hits = []
+    const defeated = new Map()
     for (const { player: attacker } of this.players.values()) {
-      const reach = attacker.r + attacker.sw_r + Math.hypot(attacker.sw_w, attacker.sw_h) / 2
+      const sword = attacker.swordHitbox()
       for (const { player: target } of this.players.values()) {
-        if (attacker === target || attacker.pos.dist(target.pos) > reach + target.r) continue
-        if (attacker.trytohit(target)) hits.push({ attacker, target, damage: attacker.lv + 5 })
+        if (target === attacker || target.hp === 0 || !swordHits(sword, target)) continue
+        target.damage(attacker.lv + 5)
+        if (target.hp === 0) defeated.set(target.id, attacker)
       }
     }
 
-    const defeated = new Map()
-    for (const { attacker, target, damage } of hits) {
-      if (target.dead()) continue
-      target.damage(damage)
-      if (target.dead()) defeated.set(target.id, attacker)
-    }
+    // Remove defeated players after all attacks so same-tick hits can land.
     for (const [id, attacker] of defeated) {
       this.leave(id)
-      if (!attacker.dead()) attacker.xpup(50)
+      if (attacker.hp > 0) attacker.addExperience(50)
     }
-
     return { changedItems: Array.from(changedItems.values()), deaths: Array.from(defeated.keys()) }
   }
-
-  nearbyItems(player) {
-    const { x, y } = player.pos
-    const radius = player.r + maxItemRadius
-    const items = []
-    for (let column = Math.floor((x - radius) / cellSize); column <= Math.floor((x + radius) / cellSize); column++) {
-      for (let row = Math.floor((y - radius) / cellSize); row <= Math.floor((y + radius) / cellSize); row++) {
-        const cell = this.itemCells.get(`${column},${row}`)
-        if (cell) items.push(...cell)
-      }
-    }
-    return items
-  }
-
-  cellKey(item) {
-    return `${Math.floor(item.pos.x / cellSize)},${Math.floor(item.pos.y / cellSize)}`
-  }
-
-  addToCell(item) {
-    const key = this.cellKey(item)
-    let cell = this.itemCells.get(key)
-    if (!cell) {
-      cell = new Set()
-      this.itemCells.set(key, cell)
-    }
-    cell.add(item)
-  }
-
-  removeFromCell(item) {
-    const key = this.cellKey(item)
-    const cell = this.itemCells.get(key)
-    cell.delete(item)
-    if (cell.size === 0) this.itemCells.delete(key)
-  }
 }
-
-module.exports = { Game }

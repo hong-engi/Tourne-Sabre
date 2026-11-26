@@ -1,24 +1,16 @@
 import { io } from 'socket.io-client'
-import { Pos, PredictedMovement } from './object.js'
+import { tickMs, swordStep, movePlayer, movementKeys } from '../../shared/movement.mjs'
+import SpatialGrid from '../../shared/spatialGrid.mjs'
+import { itemViewRadius } from './mapdraw.js'
 
-const tickMs = 1000 / 30
 const interpolationMs = 2 * tickMs
-const swordStep = Math.PI / 30
-const keyBits = new Map([['w', 1], ['s', 2], ['a', 4], ['d', 8]])
-
-function playerFromState(state) {
-  return { ...state, id: state._id, pos: new Pos(state.x, state.y) }
-}
-
 function interpolatePlayer(before, after, fraction) {
   const turn = after.sw_angle - before.sw_angle
   const shortestTurn = Math.atan2(Math.sin(turn), Math.cos(turn))
   return {
     ...after,
-    pos: new Pos(
-      before.x + (after.x - before.x) * fraction,
-      before.y + (after.y - before.y) * fraction
-    ),
+    x: before.x + (after.x - before.x) * fraction,
+    y: before.y + (after.y - before.y) * fraction,
     sw_angle: before.sw_angle + shortestTurn * fraction,
   }
 }
@@ -29,13 +21,13 @@ export default class GameClient {
   }
 
   connect(reportStatus) {
-    const socket = io(process.env.REACT_APP_GAME_SERVER || undefined, {
+    const socket = io(import.meta.env.REACT_APP_GAME_SERVER || undefined, {
       transports: ['websocket'],
     })
     this.socket = socket
     this.reportStatus = reportStatus
     socket.on('connect', () => this.status('ready'))
-    socket.on('connect_error', () => this.status('connecting', 'Connecting to game server…'))
+    socket.on('connect_error', () => this.status('connecting'))
     socket.on('disconnect', () => {
       const wasPlaying = this.id !== null
       this.reset()
@@ -68,12 +60,13 @@ export default class GameClient {
     this.id = null
     this.joinAttempt = null
     this.items = new Map()
+    this.itemGrid = new SpatialGrid(256)
     this.snapshots = []
     this.keys = 0
     this.seq = 0
     this.local = null
     this.authoritative = null
-    this.correction = new Pos(0, 0)
+    this.correction = { x: 0, y: 0 }
   }
 
   join(name) {
@@ -98,14 +91,19 @@ export default class GameClient {
   }
 
   receiveItems(items) {
-    for (const item of items) {
-      this.items.set(item._id, { ...item, pos: new Pos(item.x, item.y) })
+    for (const { _id, x, y, color, r } of items) {
+      const existing = this.items.get(_id)
+      if (existing) this.itemGrid.remove(existing)
+      const item = { pos: { x, y }, color, r }
+      this.items.set(_id, item)
+      this.itemGrid.add(item)
     }
   }
 
   setKey(key, pressed) {
-    const bit = keyBits.get(key.toLowerCase())
-    if (!bit || this.id === null) return
+    const lower = key.toLowerCase()
+    if (this.id === null || !Object.hasOwn(movementKeys, lower)) return
+    const bit = movementKeys[lower]
     this.setKeys(pressed ? this.keys | bit : this.keys & ~bit)
   }
 
@@ -121,18 +119,18 @@ export default class GameClient {
     const previous = this.snapshots[this.snapshots.length - 1]
     if (previous && previous.tick >= tick) return
     const now = performance.now()
-    const byId = new Map(players.map(player => [player._id, playerFromState(player)]))
+    const byId = new Map(players.map(player => [player._id, player]))
     const own = byId.get(this.id)
     if (!own) return
 
     this.advance(now)
-    if (!this.local || this.local.pos.dist(own.pos) > 200) {
-      this.local = new PredictedMovement(own.pos, new Pos(own.vx, own.vy))
+    if (!this.local || (this.local.pos.x - own.x) ** 2 + (this.local.pos.y - own.y) ** 2 > 200 ** 2) {
+      this.local = { pos: { x: own.x, y: own.y }, speed: { x: own.vx, y: own.vy } }
       this.lastStep = now
-      this.correction = new Pos(0, 0)
+      this.correction = { x: 0, y: 0 }
     } else if (own.inputSeq === this.seq || this.seq === 0) {
       // Keep recent local input visible until the server has applied it.
-      this.correction = own.pos.addv(this.local.pos, -1)
+      this.correction = { x: own.x - this.local.pos.x, y: own.y - this.local.pos.y }
     }
 
     this.authoritative = own
@@ -145,27 +143,27 @@ export default class GameClient {
     if (!this.local) return
     if (now - this.lastStep > 250) this.lastStep = now
     while (now - this.lastStep >= tickMs) {
-      const dx = Number(Boolean(this.keys & 8)) - Number(Boolean(this.keys & 4))
-      const dy = Number(Boolean(this.keys & 2)) - Number(Boolean(this.keys & 1))
-      this.local.step(dx, dy)
+      movePlayer(this.local.pos, this.local.speed, this.keys)
       this.lastStep += tickMs
 
       // Spread small server corrections over several prediction steps.
-      this.local.pos.move(this.correction.x * 0.25, this.correction.y * 0.25)
+      this.local.pos.x += this.correction.x * 0.25
+      this.local.pos.y += this.correction.y * 0.25
       this.correction.x *= 0.75
       this.correction.y *= 0.75
     }
   }
 
   renderState(now) {
-    if (!this.local) return { me: null, players: [], items: this.items.values() }
+    if (!this.local) return null
     this.advance(now)
-    const fraction = Math.min(1, (now - this.lastStep) / tickMs)
+    const fraction = Math.max(0, Math.min(1, (now - this.lastStep) / tickMs))
     const me = {
       ...this.authoritative,
-      pos: this.local.pos.addv(this.local.speed, fraction),
+      x: this.local.pos.x + this.local.speed.x * fraction,
+      y: this.local.pos.y + this.local.speed.y * fraction,
       sw_angle: this.authoritative.sw_angle -
-        swordStep * Math.min(3, (now - this.authoritativeAt) / tickMs),
+        swordStep * Math.max(0, Math.min(3, (now - this.authoritativeAt) / tickMs)),
     }
 
     const renderAt = now - interpolationMs
@@ -185,6 +183,6 @@ export default class GameClient {
       }
     }
 
-    return { me, players, items: this.items.values() }
+    return { me, players, items: this.itemGrid.nearby(me, itemViewRadius) }
   }
 }

@@ -1,51 +1,56 @@
-.App {
-  text-align: center;
+body {
+  margin: 0;
+  background: #000;
+  font-family: system-ui, sans-serif;
 }
 
-.App-logo {
-  height: 40vmin;
-  pointer-events: none;
+.arena {
+  position: relative;
+  width: min(100vw, 100dvh);
+  margin-inline: auto;
 }
 
-@media (prefers-reduced-motion: no-preference) {
-  .App-logo {
-    animation: App-logo-spin infinite 20s linear;
-  }
+.arena canvas {
+  display: block;
+  width: 100%;
+  height: auto;
 }
 
-.App-header {
-  background-color: #000000;
-  min-height: 100vh;
+.join-overlay {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: rgb(0 0 0 / 30%);
+}
+
+.join-form {
+  max-width: calc(100% - 2rem);
+  padding: 1rem;
+  background: white;
+  border-radius: 0.25rem;
+  box-sizing: border-box;
+}
+
+.join-fields {
   display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  font-size: calc(10px + 2vmin);
-  color: black;
-}
-@keyframes App-logo-spin {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
-}
-.above {
-  position: absolute;
-  background-color: rgba(50,50,50,0.5);
-  top: 50%;
-  left: 50%;
-  -moz-transform: translateX(-50%) translateY(-50%);
-  -webkit-transform: translateX(-50%) translateY(-50%);
-  transform: translateX(-50%) translateY(-50%);
+  align-items: end;
+  gap: 0.5rem;
 }
 
-.center {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  -moz-transform: translateX(-50%) translateY(-50%);
-  -webkit-transform: translateX(-50%) translateY(-50%);
-  transform: translateX(-50%) translateY(-50%);
+.join-form label {
+  display: grid;
+  min-width: 0;
+  gap: 0.25rem;
+}
+
+.join-form input,
+.join-form button {
+  min-width: 0;
+  padding: 0.5rem;
+  font: inherit;
+}
+
+.join-form p {
+  margin: 0.75rem 0 0;
 }

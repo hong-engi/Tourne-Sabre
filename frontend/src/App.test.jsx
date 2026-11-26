@@ -1,19 +1,20 @@
 import { act, fireEvent, render, screen } from '@testing-library/react'
+import { test, expect, vi } from 'vitest'
 import { io } from 'socket.io-client'
-import App from './App'
+import App from './App.jsx'
 
-jest.mock('socket.io-client', () => ({ io: jest.fn() }))
-jest.mock('./canvas.js', () => () => null)
+vi.mock('socket.io-client', () => ({ io: vi.fn() }))
+vi.mock('./Canvas.jsx', () => ({ default: () => null }))
 
 test('joins through the socket and returns to name entry on death', () => {
   const handlers = new Map()
   const socket = {
     connected: true,
     on: (event, handler) => handlers.set(event, handler),
-    timeout: jest.fn(),
-    emit: jest.fn(),
-    removeAllListeners: jest.fn(),
-    disconnect: jest.fn(),
+    timeout: vi.fn(),
+    emit: vi.fn(),
+    removeAllListeners: vi.fn(),
+    disconnect: vi.fn(),
   }
   socket.timeout.mockReturnValue(socket)
   io.mockReturnValue(socket)

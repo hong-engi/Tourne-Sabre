@@ -1,21 +1,28 @@
-const express = require('express')
-const http = require('http')
-const path = require('path')
-const { Server } = require('socket.io')
-const { Game } = require('./game')
+import express from 'express'
+import { createServer } from 'node:http'
+import { fileURLToPath } from 'node:url'
+import { Server } from 'socket.io'
+import { Game } from './game.js'
+import { tickMs } from '../../shared/movement.mjs'
 
-const port = process.env.PORT || 8080
+const port = Number(process.env.PORT ?? 8080)
 const app = express()
-app.use(express.static(path.join(__dirname, '../../frontend/build')))
+app.use(express.static(fileURLToPath(new URL('../../frontend/build/', import.meta.url))))
 
-const server = http.createServer(app)
+const server = createServer(app)
 const io = new Server(server, {
   transports: ['websocket'],
   maxHttpBufferSize: 16 * 1024,
 })
 const game = new Game()
 const room = 'players'
-const ticksPerSecond = 30
+let gameTimer
+
+function stopWhenEmpty() {
+  if (game.size > 0) return
+  clearInterval(gameTimer)
+  gameTimer = undefined
+}
 
 io.on('connection', (socket) => {
   socket.on('game:join', (payload, reply) => {
@@ -29,6 +36,7 @@ io.on('connection', (socket) => {
     const initialState = game.join(socket.id, name.trim())
     socket.join(room)
     reply(initialState)
+    gameTimer ??= setInterval(advanceGame, tickMs)
   })
 
   socket.on('game:input', (payload) => {
@@ -37,11 +45,11 @@ io.on('connection', (socket) => {
 
   socket.on('disconnect', () => {
     game.leave(socket.id)
+    stopWhenEmpty()
   })
 })
 
-setInterval(() => {
-  if (game.size === 0) return
+function advanceGame() {
   const { changedItems, deaths } = game.step()
   for (const id of deaths) {
     const socket = io.sockets.sockets.get(id)
@@ -51,9 +59,10 @@ setInterval(() => {
     }
   }
   if (changedItems.length) io.to(room).emit('game:items', changedItems)
-  io.to(room).volatile.emit('game:state', game.snapshot())
-}, 1000 / ticksPerSecond)
+  if (game.size > 0) io.to(room).volatile.emit('game:state', game.snapshot())
+  stopWhenEmpty()
+}
 
 server.listen(port, () => {
-  console.log(`Listening on port ${port}`)
+  console.log(`Listening on port ${server.address().port}`)
 })
