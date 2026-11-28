@@ -6,11 +6,12 @@ Tourne-Sabre is a browser game with two independent npm packages:
 
 - `frontend/src/`: React UI, canvas rendering (`canvas.js`, `mapdraw.js`), game updates (`frameUpdater.js`), and client-side game objects (`object.js`).
 - `frontend/public/`: static HTML, icons, and manifest. Imported artwork such as `sword.png` lives in `frontend/src/`.
-- `backend/src/app.js`: Express API and Socket.IO startup. `routes/map.js` defines game endpoints, `models/` defines Mongoose schemas, and `db/` contains persistence helpers.
+- `backend/src/app.js`: Express API, Socket.IO, and optional static `frontend/build/` serving on a single port (`process.env.PORT || 8080`). `routes/map.js` defines game endpoints, `models/` defines Mongoose schemas, and `db/` contains persistence helpers.
 - `frontend/src/*.test.js` and `setupTests.js`: frontend input, skills, and UI tests.
 - `backend/src/game/`: shared AI simulation, server loop, and Node.js combat tests.
 - `tools/feedback/`: local skill/augment feedback page (see Feedback Workflow).
 - [PIXEL_ART_WORKFLOW.md](PIXEL_ART_WORKFLOW.md): repository-root guide for pixel asset generation, Fixer conversion, 16-color reduction, and direct pixel cleanup. Read it before creating or modifying pixel artwork.
+- [DEPLOY.md](DEPLOY.md): production deployment guide (single-port server, `Dockerfile`, `render.yaml`, MongoDB Atlas, and `MONGODB_URI` / `.env.local` handling).
 
 Game objects exist in both packages; check both implementations when changing shared fields or behavior. `frontend/src/gameRules.js` is a browser-safe CommonJS rules module also consumed by the backend; keep progression definitions shared.
 
@@ -22,9 +23,9 @@ Run commands from the repository root:
 
 - `cd frontend && npm ci`: install frontend dependencies from its lockfile; repeat in `backend` for server dependencies.
 - `npm start --prefix frontend`: start the React development server at `http://localhost:3000`.
-- `npm start --prefix backend`: start the API on port `8080` and Socket.IO on `8081`; requires MongoDB configuration first.
+- `npm start --prefix backend`: start the unified API + Socket.IO server on `PORT` (default `8080`, also serves `frontend/build/` when present); requires MongoDB (`MONGODB_URI` or local `127.0.0.1:27017`).
 - `npm run watch --prefix backend`: same server under `src/supervisor.js`, which restarts it after edits to `backend/src` or the shared `gameRules.js`/`bodyPhysics.js`, but only once `GET /map/player` is empty (a restart wipes players).
-- `npm run build --prefix frontend`: create the production bundle in `frontend/build/`.
+- `NODE_OPTIONS=--openssl-legacy-provider npm run build --prefix frontend`: create the production bundle in `frontend/build/` (`NODE_OPTIONS` needed on Node 18+ for `react-scripts 4`).
 - `npm test --prefix frontend`: run Jest in watch mode.
 - `CI=true npm test --prefix frontend -- --watchAll=false`: run frontend tests once.
 
@@ -64,4 +65,4 @@ History uses short, informal subjects such as `kill added`; no strict convention
 
 ## Configuration & Data Safety
 
-Replace the hardcoded MongoDB connection with disposable local configuration before starting the backend: startup clears player/item collections and seeds items. Keep credentials out of commits. Check client URLs in `map.js`, `canvas.js`, and `setupProxy.js` when changing ports. Avoid incidental edits to tracked `backend/node_modules/` files.
+Replace the hardcoded MongoDB connection with disposable local configuration before starting the backend: startup clears player/item collections and seeds items. Keep credentials out of commits (store personal `MONGODB_URI` only in gitignored `.env.local`; see [DEPLOY.md](DEPLOY.md)). Check client URL resolution in `apiConfig.js` and `setupProxy.js` when changing ports. Avoid incidental edits to tracked `backend/node_modules/` files.
