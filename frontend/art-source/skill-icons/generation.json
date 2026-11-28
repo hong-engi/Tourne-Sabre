@@ -1,0 +1,99 @@
+[
+  {
+    "id": "reverse",
+    "tool": "built-in imagegen",
+    "generated_file": "exec-f72aaaba-bdf2-4f89-a754-e465e673c418.png",
+    "source_file": "sources/reverse.png"
+  },
+  {
+    "id": "giant",
+    "tool": "built-in imagegen",
+    "generated_file": "exec-7896807a-cda1-415b-a6db-e4c65629ef99.png",
+    "source_file": "sources/giant.png"
+  },
+  {
+    "id": "accel",
+    "tool": "built-in imagegen",
+    "generated_file": "exec-a7ad4e01-6a4c-4ce9-8702-28aad39f7f92.png",
+    "source_file": "sources/accel.png"
+  },
+  {
+    "id": "thrust",
+    "tool": "built-in imagegen",
+    "generated_file": "exec-4002cd94-31f5-4370-ac11-2dc74a011aef.png",
+    "source_file": "sources/thrust.png"
+  },
+  {
+    "id": "blink",
+    "tool": "built-in imagegen",
+    "generated_file": "exec-e1dca487-747e-40ed-8bd3-2f0558c0ef09.png",
+    "source_file": "sources/blink.png"
+  },
+  {
+    "id": "ghost",
+    "tool": "built-in imagegen",
+    "generated_file": "exec-3f596e40-6121-404c-bd4d-89bed62917c3.png",
+    "source_file": "sources/ghost.png"
+  },
+  {
+    "id": "heal",
+    "tool": "built-in imagegen",
+    "generated_file": "exec-9db6e912-8005-4d46-8613-8ad565635171.png",
+    "source_file": "sources/heal.png"
+  },
+  {
+    "id": "dash",
+    "tool": "built-in imagegen",
+    "generated_file": "exec-6d39e896-3752-4f1f-ad69-7c3e4ea776ef.png",
+    "source_file": "sources/dash.png"
+  },
+  {
+    "id": "twinBlade",
+    "tool": "built-in imagegen",
+    "generated_file": "exec-e7d77523-4a74-402e-82b2-88b83d54a3b2.png",
+    "source_file": "sources/twinBlade.png",
+    "selection": "Original broad-sword silhouette restored; slender revision rejected."
+  },
+  {
+    "id": "turret",
+    "tool": "built-in imagegen",
+    "generated_file": "exec-43d6dea9-8351-4c82-8ca5-658f14433195.png",
+    "source_file": "sources/turret.png"
+  },
+  {
+    "id": "boomerang",
+    "tool": "built-in imagegen",
+    "generated_file": "exec-0168b9bc-0f79-48ff-aed7-63e594b6a4f7.png",
+    "source_file": "sources/boomerang.png"
+  },
+  {
+    "id": "slam",
+    "tool": "built-in imagegen",
+    "generated_file": "exec-92fe5e1c-6854-4c4c-8117-9bdec5f35575.png",
+    "source_file": "sources/slam.png"
+  },
+  {
+    "id": "ignite",
+    "tool": "built-in imagegen",
+    "generated_file": "exec-ef6dc0ca-bffa-46f9-9ea8-ae6e58aa7c31.png",
+    "source_file": "sources/ignite.png"
+  },
+  {
+    "id": "barrier",
+    "tool": "built-in imagegen",
+    "generated_file": "exec-e51a011a-0ed3-4720-ae73-80ed17dfd6aa.png",
+    "source_file": "sources/barrier.png"
+  },
+  {
+    "id": "exhaust",
+    "tool": "built-in imagegen",
+    "generated_file": "exec-b57453fd-c054-4135-b41e-dea0681eb263.png",
+    "source_file": "sources/exhaust.png"
+  },
+  {
+    "id": "smite",
+    "tool": "built-in imagegen",
+    "generated_file": "exec-acd28604-7925-482b-8a2e-db8f7ff68bf5.png",
+    "source_file": "sources/smite.png"
+  }
+]

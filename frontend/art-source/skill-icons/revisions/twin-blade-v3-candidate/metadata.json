@@ -1,0 +1,19 @@
+{
+  "cols": 48,
+  "rows": 48,
+  "step_x": 26.125,
+  "step_y": 26.125,
+  "consensus": "forced",
+  "confidence": "medium",
+  "detect_s": 0.0,
+  "recon_s": 1.396,
+  "force_step": 26.125,
+  "size": [
+    40,
+    40
+  ],
+  "visible_colors": 13,
+  "generator": "built-in imagegen edit",
+  "reference": "../twin-blade-v1/source.png",
+  "status": "review candidate"
+}

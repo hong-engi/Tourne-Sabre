@@ -1,0 +1,497 @@
+{
+  "reverse": {
+    "cols": 48,
+    "rows": 48,
+    "step_x": 26.125,
+    "step_y": 26.125,
+    "consensus": "forced",
+    "confidence": "medium",
+    "detect_s": 0.0,
+    "recon_s": 1.25,
+    "source_size": [
+      1254,
+      1254
+    ],
+    "content_size": [
+      31,
+      37
+    ],
+    "native_size": [
+      39,
+      39
+    ],
+    "visible_colors": 14,
+    "alpha": [
+      0,
+      255
+    ],
+    "file": "reverse.png",
+    "options": {
+      "force_step": 26.125
+    }
+  },
+  "giant": {
+    "cols": 48,
+    "rows": 48,
+    "step_x": 26.125,
+    "step_y": 26.125,
+    "consensus": "forced",
+    "confidence": "medium",
+    "detect_s": 0.0,
+    "recon_s": 1.345,
+    "source_size": [
+      1254,
+      1254
+    ],
+    "content_size": [
+      39,
+      41
+    ],
+    "native_size": [
+      43,
+      43
+    ],
+    "visible_colors": 14,
+    "alpha": [
+      0,
+      255
+    ],
+    "file": "giant.png",
+    "options": {
+      "force_step": 26.125
+    }
+  },
+  "accel": {
+    "cols": 48,
+    "rows": 48,
+    "step_x": 26.125,
+    "step_y": 26.125,
+    "consensus": "forced",
+    "confidence": "medium",
+    "detect_s": 0.0,
+    "recon_s": 1.439,
+    "source_size": [
+      1254,
+      1254
+    ],
+    "content_size": [
+      37,
+      37
+    ],
+    "native_size": [
+      39,
+      39
+    ],
+    "visible_colors": 13,
+    "alpha": [
+      0,
+      255
+    ],
+    "file": "accel.png",
+    "options": {
+      "force_step": 26.125
+    }
+  },
+  "thrust": {
+    "cols": 48,
+    "rows": 48,
+    "step_x": 26.125,
+    "step_y": 26.125,
+    "consensus": "forced",
+    "confidence": "medium",
+    "detect_s": 0.0,
+    "recon_s": 0.941,
+    "source_size": [
+      1254,
+      1254
+    ],
+    "content_size": [
+      44,
+      43
+    ],
+    "native_size": [
+      46,
+      46
+    ],
+    "visible_colors": 14,
+    "alpha": [
+      0,
+      255
+    ],
+    "file": "thrust.png",
+    "options": {
+      "force_step": 26.125
+    }
+  },
+  "blink": {
+    "cols": 48,
+    "rows": 48,
+    "step_x": 26.125,
+    "step_y": 26.125,
+    "consensus": "forced",
+    "confidence": "medium",
+    "detect_s": 0.0,
+    "recon_s": 0.971,
+    "source_size": [
+      1254,
+      1254
+    ],
+    "content_size": [
+      38,
+      36
+    ],
+    "native_size": [
+      40,
+      40
+    ],
+    "visible_colors": 10,
+    "alpha": [
+      0,
+      255
+    ],
+    "file": "blink.png",
+    "options": {
+      "force_step": 26.125
+    }
+  },
+  "ghost": {
+    "cols": 48,
+    "rows": 48,
+    "step_x": 26.125,
+    "step_y": 26.125,
+    "consensus": "forced",
+    "confidence": "medium",
+    "detect_s": 0.0,
+    "recon_s": 0.811,
+    "source_size": [
+      1254,
+      1254
+    ],
+    "content_size": [
+      35,
+      36
+    ],
+    "native_size": [
+      38,
+      38
+    ],
+    "visible_colors": 11,
+    "alpha": [
+      0,
+      255
+    ],
+    "file": "ghost.png",
+    "options": {
+      "force_step": 26.125
+    }
+  },
+  "heal": {
+    "cols": 48,
+    "rows": 48,
+    "step_x": 26.125,
+    "step_y": 26.125,
+    "consensus": "forced",
+    "confidence": "medium",
+    "detect_s": 0.0,
+    "recon_s": 0.945,
+    "source_size": [
+      1254,
+      1254
+    ],
+    "content_size": [
+      41,
+      42
+    ],
+    "native_size": [
+      44,
+      44
+    ],
+    "visible_colors": 14,
+    "alpha": [
+      0,
+      255
+    ],
+    "file": "heal.png",
+    "options": {
+      "force_step": 26.125
+    }
+  },
+  "dash": {
+    "cols": 48,
+    "rows": 48,
+    "step_x": 26.125,
+    "step_y": 26.125,
+    "consensus": "forced",
+    "confidence": "medium",
+    "detect_s": 0.0,
+    "recon_s": 1.347,
+    "source_size": [
+      1254,
+      1254
+    ],
+    "content_size": [
+      42,
+      25
+    ],
+    "native_size": [
+      44,
+      44
+    ],
+    "visible_colors": 14,
+    "alpha": [
+      0,
+      255
+    ],
+    "file": "dash.png",
+    "options": {
+      "force_step": 26.125
+    }
+  },
+  "twinBlade": {
+    "cols": 48,
+    "rows": 48,
+    "step_x": 26.125,
+    "step_y": 26.125,
+    "consensus": "forced",
+    "confidence": "medium",
+    "source_size": [
+      1254,
+      1254
+    ],
+    "content_size": [
+      38,
+      37
+    ],
+    "native_size": [
+      40,
+      40
+    ],
+    "visible_colors": 13,
+    "alpha": [
+      0,
+      255
+    ],
+    "file": "twin-blade.png",
+    "options": {
+      "force_step": 26.125
+    },
+    "restored_from": "revisions/twin-blade-v1/asset.png"
+  },
+  "turret": {
+    "cols": 48,
+    "rows": 48,
+    "step_x": 26.125,
+    "step_y": 26.125,
+    "consensus": "forced",
+    "confidence": "medium",
+    "detect_s": 0.0,
+    "recon_s": 1.624,
+    "source_size": [
+      1254,
+      1254
+    ],
+    "content_size": [
+      24,
+      41
+    ],
+    "native_size": [
+      43,
+      43
+    ],
+    "visible_colors": 13,
+    "alpha": [
+      0,
+      255
+    ],
+    "file": "turret.png",
+    "options": {
+      "force_step": 26.125
+    }
+  },
+  "slam": {
+    "cols": 48,
+    "rows": 48,
+    "step_x": 26.125,
+    "step_y": 26.125,
+    "consensus": "forced",
+    "confidence": "medium",
+    "detect_s": 0.0,
+    "recon_s": 1.52,
+    "source_size": [
+      1254,
+      1254
+    ],
+    "content_size": [
+      38,
+      43
+    ],
+    "native_size": [
+      45,
+      45
+    ],
+    "visible_colors": 13,
+    "alpha": [
+      0,
+      255
+    ],
+    "file": "slam.png",
+    "options": {
+      "force_step": 26.125
+    }
+  },
+  "boomerang": {
+    "cols": 48,
+    "rows": 48,
+    "step_x": 26.125,
+    "step_y": 26.125,
+    "consensus": "forced",
+    "confidence": "medium",
+    "detect_s": 0.0,
+    "recon_s": 1.552,
+    "source_size": [
+      1254,
+      1254
+    ],
+    "content_size": [
+      38,
+      36
+    ],
+    "native_size": [
+      40,
+      40
+    ],
+    "visible_colors": 16,
+    "alpha": [
+      0,
+      255
+    ],
+    "file": "boomerang.png",
+    "options": {
+      "force_step": 26.125
+    }
+  },
+  "ignite": {
+    "cols": 48,
+    "rows": 48,
+    "step_x": 26.125,
+    "step_y": 26.125,
+    "consensus": "forced",
+    "confidence": "medium",
+    "detect_s": 0.0,
+    "recon_s": 0.985,
+    "source_size": [
+      1254,
+      1254
+    ],
+    "content_size": [
+      34,
+      41
+    ],
+    "native_size": [
+      43,
+      43
+    ],
+    "visible_colors": 13,
+    "alpha": [
+      0,
+      255
+    ],
+    "file": "ignite.png",
+    "options": {
+      "force_step": 26.125
+    }
+  },
+  "smite": {
+    "cols": 48,
+    "rows": 48,
+    "step_x": 26.125,
+    "step_y": 26.125,
+    "consensus": "forced",
+    "confidence": "medium",
+    "detect_s": 0.0,
+    "recon_s": 0.914,
+    "source_size": [
+      1254,
+      1254
+    ],
+    "content_size": [
+      40,
+      41
+    ],
+    "native_size": [
+      43,
+      43
+    ],
+    "visible_colors": 11,
+    "alpha": [
+      0,
+      255
+    ],
+    "file": "smite.png",
+    "options": {
+      "force_step": 26.125
+    }
+  },
+  "barrier": {
+    "cols": 48,
+    "rows": 48,
+    "step_x": 26.125,
+    "step_y": 26.125,
+    "consensus": "forced",
+    "confidence": "medium",
+    "detect_s": 0.0,
+    "recon_s": 1.378,
+    "source_size": [
+      1254,
+      1254
+    ],
+    "content_size": [
+      42,
+      39
+    ],
+    "native_size": [
+      44,
+      44
+    ],
+    "visible_colors": 11,
+    "alpha": [
+      0,
+      255
+    ],
+    "file": "barrier.png",
+    "options": {
+      "force_step": 26.125
+    }
+  },
+  "exhaust": {
+    "cols": 48,
+    "rows": 48,
+    "step_x": 26.125,
+    "step_y": 26.125,
+    "consensus": "forced",
+    "confidence": "medium",
+    "detect_s": 0.0,
+    "recon_s": 1.207,
+    "source_size": [
+      1254,
+      1254
+    ],
+    "content_size": [
+      31,
+      37
+    ],
+    "native_size": [
+      39,
+      39
+    ],
+    "visible_colors": 12,
+    "alpha": [
+      0,
+      255
+    ],
+    "file": "exhaust.png",
+    "options": {
+      "force_step": 26.125
+    }
+  }
+}

@@ -1,0 +1,50 @@
+{
+  "reverse": {
+    "force_step": 26.125
+  },
+  "giant": {
+    "force_step": 26.125
+  },
+  "accel": {
+    "force_step": 26.125
+  },
+  "thrust": {
+    "force_step": 26.125
+  },
+  "blink": {
+    "force_step": 26.125
+  },
+  "ghost": {
+    "force_step": 26.125
+  },
+  "heal": {
+    "force_step": 26.125
+  },
+  "dash": {
+    "force_step": 26.125
+  },
+  "twinBlade": {
+    "force_step": 26.125
+  },
+  "turret": {
+    "force_step": 26.125
+  },
+  "boomerang": {
+    "force_step": 26.125
+  },
+  "slam": {
+    "force_step": 26.125
+  },
+  "ignite": {
+    "force_step": 26.125
+  },
+  "barrier": {
+    "force_step": 26.125
+  },
+  "exhaust": {
+    "force_step": 26.125
+  },
+  "smite": {
+    "force_step": 26.125
+  }
+}

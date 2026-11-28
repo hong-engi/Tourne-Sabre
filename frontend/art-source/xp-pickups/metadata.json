@@ -1,0 +1,62 @@
+{
+  "xp-chip": {
+    "cols": 63,
+    "rows": 62,
+    "step_x": 9.9185,
+    "step_y": 10.1044,
+    "consensus": "arbitrated",
+    "confidence": "medium",
+    "detect_s": 2.365,
+    "recon_s": 0.437,
+    "native_size": [
+      13,
+      22
+    ],
+    "visible_colors": 15
+  },
+  "xp-gem": {
+    "cols": 67,
+    "rows": 69,
+    "step_x": 9.3437,
+    "step_y": 9.0423,
+    "consensus": "arbitrated",
+    "confidence": "medium",
+    "detect_s": 1.925,
+    "recon_s": 0.452,
+    "native_size": [
+      37,
+      33
+    ],
+    "visible_colors": 16
+  },
+  "xp-cluster": {
+    "cols": 68,
+    "rows": 67,
+    "step_x": 9.259,
+    "step_y": 9.3903,
+    "consensus": "arbitrated",
+    "confidence": "medium",
+    "detect_s": 1.99,
+    "recon_s": 0.537,
+    "native_size": [
+      40,
+      45
+    ],
+    "visible_colors": 16
+  },
+  "xp-crown": {
+    "cols": 72,
+    "rows": 63,
+    "step_x": 8.7387,
+    "step_y": 9.9768,
+    "consensus": "arbitrated",
+    "confidence": "medium",
+    "detect_s": 2.161,
+    "recon_s": 0.644,
+    "native_size": [
+      57,
+      49
+    ],
+    "visible_colors": 16
+  }
+}

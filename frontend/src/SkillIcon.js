@@ -1,0 +1,47 @@
+import {useEffect,useRef,useState} from 'react';
+import {prepareIcon} from './skillIconOutline';
+import reverse from './assets/pixel/skills/reverse.png';
+import giant from './assets/pixel/skills/giant.png';
+import accel from './assets/pixel/skills/accel.png';
+import thrust from './assets/pixel/skills/thrust.png';
+import dash from './assets/pixel/skills/dash.png';
+import twinBlade from './assets/pixel/skills/twin-blade.png';
+import turret from './assets/pixel/skills/turret.png';
+import boomerang from './assets/pixel/skills/boomerang.png';
+import slam from './assets/pixel/skills/slam.png';
+import blink from './assets/pixel/skills/blink.png';
+import ghost from './assets/pixel/skills/ghost.png';
+import heal from './assets/pixel/skills/heal.png';
+import ignite from './assets/pixel/skills/ignite.png';
+import barrier from './assets/pixel/skills/barrier.png';
+import exhaust from './assets/pixel/skills/exhaust.png';
+import smite from './assets/pixel/skills/smite.png';
+
+// Bind artwork to ability identity, so changing QWER / DF loadouts follows it.
+const ICONS = {reverse,giant,accel,thrust,dash,twinBlade,turret,boomerang,slam,
+  blink,ghost,heal,ignite,barrier,exhaust,smite};
+const DEFAULT_KEYS = {KeyQ:'reverse',KeyW:'giant',KeyE:'accel',KeyR:'thrust'};
+export default function SkillIcon({id,code}) {
+  const image=useRef(null);
+  const [prepared,setPrepared]=useState(null);
+  const iconId = id || DEFAULT_KEYS[code] || code;
+  const src = ICONS[iconId];
+  useEffect(()=>{
+    if(!src||!image.current)return;
+    let disposed=false,request=0,lastSize=0;
+    const update=()=>{
+      if(disposed||!image.current)return;
+      const size=Math.max(16,Math.min(64,Math.round(image.current.getBoundingClientRect().width)||40));
+      if(size===lastSize)return;
+      lastSize=size;const version=++request;
+      prepareIcon(src,size).then(url=>{if(!disposed&&version===request)setPrepared({src,url,size});});
+    };
+    update();
+    const observer=typeof ResizeObserver==='function'?new ResizeObserver(update):null;
+    observer?.observe(image.current);
+    return ()=>{disposed=true;observer?.disconnect();};
+  },[src]);
+  if (!src) return null;
+  const ready=prepared?.src===src;
+  return <img ref={image} className="skill-icon" src={ready?prepared.url:src} alt="" aria-hidden="true" draggable={false} data-skill-icon={iconId} data-outline-size={ready?prepared.size:undefined} width="40" height="40"/>;
+}

@@ -1,3 +1,4 @@
+const {levelForXp, stats}=require('./gameRules');
 var mapSize = 3000;
 function getRandomId(){
     var letters = 'HONGENGIisworkingreallyhard'
@@ -13,7 +14,7 @@ function getRandomColor() {
     var color = '#';
     let i = Math.floor(Math.random()*3);
     for(let j=0;j<3;j++){
-        if(j==i) color+='FF';
+        if(j===i) color+='FF';
         else for (var k = 0; k < 2; k++) {
             color += letters[Math.floor(Math.random() * 10)];
         }
@@ -79,6 +80,8 @@ class Player{
         this.xp = 0;
         this.lv = 1;
         this.hpmax = 100;
+        this.augments = [];
+        this.physicsAck={seq:0,x:0,y:0,vx:0,vy:0};
      
         this.color = getRandomColor();
     }
@@ -105,6 +108,7 @@ class Player{
         newPlayer.r = sch.r
         newPlayer.sw_angle = sch.sw_angle
         newPlayer.sw_r = sch.sw_r
+        newPlayer.sw_w = sch.sw_w || 40
         newPlayer.sw_h = sch.sw_h
         newPlayer.sw_speed = sch.sw_speed
         newPlayer.hp = sch.hp
@@ -120,55 +124,14 @@ class Player{
     }
 
     trytohit(enemy){
-        if(enemy.id == this.id)return;
-        let sp = this.sw_pos();
-        function pos_x_line_meet(p1,p2,p){
-            return ((p.y-p1.y)*(p.x-p2.x)/(p1.y-p2.y)+p1.x>p.x) &&
-                ((p.y-p1.y)*(p.y-p2.y)<0);
-        }
-        function dist(p1,p){
-            return Math.pow(Math.pow(p1.x-p.x,2)+Math.pow(p1.y-p.y,2),0.5)
-        }
-        function point_circle_meet(p1,p,r){
-            return dist(p1,p)<r
-        }
-        function angleof3p(pr,p,pl){
-            let prp = dist(pr,p)
-            let plp = dist(pl,p)
-            let prl = dist(pr,pl)
-            return Math.acos((prp*prp+plp*plp+prl*prl)/(2*prp*plp))
-        }
-        function line_circle_meet(p1,p2,p,r){
-            let a=p2.y-p1.y,b=p1.x-p2.x,c=p1.x*(p1.y-p2.y)+p1.y*(p2.x-p1.x);
-            let d = Math.abs(a*p.x+b*p.y+c)/Math.pow(a*a+b*b,0.5)
-            if(d<r){
-                return angleof3p(p,p1,p2)<Math.PI/2 && angleof3p(p,p2,p1)<Math.PI/2
-            }
-        }
-        let meet_cnt = 0;
-        let w = this.sw_w/2;
-        let h = this.sw_h/2;
-        let alpha = Math.atan(w/h)
-        let beta = this.sw_angle-alpha
-        let r = Math.pow(w*w+h*h,0.5)
-        var dir = [new Pos(0,-r).rot(new Pos(0,0),beta),
-            new Pos(0,-r).rot(new Pos(0,0),beta+2*alpha)]
-        for(let i=0;i<4;i++){
-            let p1 = sp.addv(dir[0]);
-            let p2 = sp.addv(dir[1]);
-            if(pos_x_line_meet(p1,p2,enemy.pos)){
-                meet_cnt++;
-            }
-            if(point_circle_meet(p1,enemy.pos,enemy.r) || 
-                line_circle_meet(p1,p2,enemy.pos,enemy.r)){
-                meet_cnt=1;
-                break;
-            }
-            let tmp = dir[0];
-            dir[0] = new Pos(0,0).addv(dir[1],-1);
-            dir[1]=tmp;
-        }
-        return meet_cnt%2 === 1
+        if(enemy.id === this.id)return false;
+        const dx = enemy.pos.x - this.pos.x, dy = enemy.pos.y - this.pos.y;
+        const c = Math.cos(this.sw_angle), s = Math.sin(this.sw_angle);
+        const x = c * dx - s * dy, y = s * dx + c * dy;
+        const nx = Math.max(-this.sw_w/2, Math.min(this.sw_w/2, x));
+        const center = -this.r - this.sw_r;
+        const ny = Math.max(center-this.sw_h/2, Math.min(center+this.sw_h/2, y));
+        return (x-nx)**2 + (y-ny)**2 <= enemy.r**2;
     }
 
     trytoeat(item){
@@ -181,17 +144,18 @@ class Player{
         this.speed.move(-this.speed.x/15,-this.speed.y/15)
     }
 
-    move(dx,dy){
-        this.pos.movev(this.speed)
-        this.accel()
-        this.bound()
+    move(dt=1/30){
+        const step=dt*30;
+        this.pos.move(this.speed.x*step,this.speed.y*step);
+        const damping=Math.pow(14/15,step);
+        this.speed.x*=damping; this.speed.y*=damping;
+        this.bound();
     }
 
     bound(){
-        if(this.pos.x>=mapSize)this.pos.x=mapSize+(this.pos.x-mapSize)/1.3;
-        if(this.pos.y>=mapSize)this.pos.y=mapSize+(this.pos.y-mapSize)/1.3;
-        if(this.pos.x<=-mapSize)this.pos.x=-mapSize+(this.pos.x+mapSize)/1.3;
-        if(this.pos.y<=-mapSize)this.pos.y=-mapSize+(this.pos.y+mapSize)/1.3;
+        const limit=mapSize-this.r;
+        this.pos.x=Math.max(-limit,Math.min(limit,this.pos.x));
+        this.pos.y=Math.max(-limit,Math.min(limit,this.pos.y));
     }
 
     sw_rot(angle,clockwise=true){
@@ -215,15 +179,16 @@ class Player{
 
     xpup(xp){
         this.xp+=xp;
-        this.r = Math.pow(25*25+this.xp,0.5)
-        if(Math.pow(this.xp/50,0.5)>this.lv)this.lvup()
+        const next=levelForXp(this.xp);
+        if (next>this.lv) {
+            this.lv=next;
+            const max=stats(this.lv,this.augments).hpmax;
+            this.hp+=Math.max(0,max-this.hpmax);
+            this.hpmax=max;
+        }
+        this.r=25;
     }
 
-    lvup(){
-        this.lv+=1
-        this.hpmax+=25
-        this.hp+=25
-    }
 }
 
 

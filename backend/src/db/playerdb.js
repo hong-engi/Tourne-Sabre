@@ -30,6 +30,8 @@ function add(player, callback) {
     xp:player.xp,
     lv:player.lv,
     color:player.color,
+    spells:require('../../../frontend/src/gameRules').validSpells(player.spells),
+    loadout:require('../../../frontend/src/gameRules').validSkills(player.loadout),
   });
   newItem.save((error,result)=>{
     if(error){
@@ -68,38 +70,10 @@ function getOne(id, callback) {
 }
 
 function update(player, callback) {
-  playerModel.updateOne({_id: player.id}, 
-    {
-      x:player.pos.x,
-      y:player.pos.y,
-      r:player.r,
-      vx:player.speed.x,
-      vy:player.speed.y,
-      sw_angle:player.sw_angle,
-      sw_r:player.sw_r,
-      xp:player.xp,
-      lv:player.lv,
-    },
-    () => {
-    callback();
-  });
+  require('../game/progression').sync(player).then(()=>callback()).catch(err=>{console.error(err.message);callback();});
 }
-
 function damage(id, dhp, callback) {
-  playerModel.findOne({_id: id}, (err, found) => {
-    if(err){
-      console.log('playerdamage',error);
-      callback([]);
-    } else {
-      if(found == null){
-        console.log('foundnull',id)
-        return;
-      }
-      playerModel.updateOne({_id: id}, {hp: found.hp-dhp}, () => {
-        callback();
-      });  
-    }
-  });
+  require('../game/progression').damage(id,dhp).then(()=>callback()).catch(err=>{console.error(err.message);callback();});
 }
 
 module.exports = {

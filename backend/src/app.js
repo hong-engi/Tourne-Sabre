@@ -37,13 +37,13 @@ server.listen(sockport, () => {
 
 const app = express();
 const port = 8080;
-const passwd = "Passwordveryhard131072!"
+const mongoUri = process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/tourne_sabre_local';
 app.use(cors());
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({
   extended: true
 }));
-mongoose.connect('mongodb://root:'+passwd+'@ssal.sparcs.org:6561?authSource=admin', {
+mongoose.connect(mongoUri, {
   useNewUrlParser: true,
   useUnifiedTopology: true
 });
@@ -56,6 +56,7 @@ db.once('open', function() {
   for(let i=0;i<1000;i++){
     itemdb.add(Object.Item.randomItem(),()=>{})
   }
+  require("./game/runtime").start();
   console.log("DB ready!");
 });
 

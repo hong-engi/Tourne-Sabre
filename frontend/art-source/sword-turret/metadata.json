@@ -1,0 +1,26 @@
+{
+  "cols": 108,
+  "rows": 99,
+  "step_x": 12.117,
+  "step_y": 12.0761,
+  "consensus": "arbitrated",
+  "confidence": "medium",
+  "detect_s": 4.84,
+  "recon_s": 2.256,
+  "source_size": [
+    1312,
+    1199
+  ],
+  "options": {},
+  "native_size": [
+    102,
+    96
+  ],
+  "visible_colors": 16,
+  "alpha": [
+    0,
+    255
+  ],
+  "fixer_commit": "ef376e57e1c272633ca2dbf5f29ec3fcf6596465",
+  "file": "frontend/src/assets/pixel/sword-turret.png"
+}

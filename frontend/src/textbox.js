@@ -1,72 +1,39 @@
-import React,{useState} from "react"
-import Box from '@mui/material/Box';
-import Stack from '@mui/material/Stack';
-import Button from '@mui/material/Button';
-import Divider from  '@mui/material/Divider';
-import {TextField} from "@material-ui/core"
-import {makePlayer} from "./canvas.js"
+import React, {useState} from 'react';
+import {makePlayer} from './canvas';
+import Loadout,{loadLoadout,saveLoadout} from './Loadout';
 
-export function Textbox({myref}){
+const adjectives=['fluffy','sleepy','tiny','brave','happy','cozy','sunny','bouncy','gentle','lucky','speedy','curious','frosty','mellow','fuzzy','golden','sneaky','clever','silly','cosmic'];
+const nouns=['bunny','fox','otter','panda','tiger','badger','raven','gecko','koala','kitten','puppy','turtle','falcon','robin','hedgehog','ferret','hamster','sparrow','capybara','penguin'];
+function randomNickname(){
+  return adjectives[Math.floor(Math.random()*adjectives.length)]+nouns[Math.floor(Math.random()*nouns.length)];
+}
 
-  const [name, setName] = useState('')
-
-  function onClick(){
-    makePlayer(name)
-    vanishThis()
+export function Textbox({onJoin, disabled}) {
+  const [name, setName] = useState('');
+  const [joining, setJoining] = useState(false);
+  const [error, setError] = useState('');
+  // QWER skills and D/F spells, remembered between visits.
+  const [loadout, setLoadout] = useState(loadLoadout);
+  function change(next) {setLoadout(next);saveLoadout(next);}
+  async function submit(event) {
+    event.preventDefault();
+    if (joining || disabled) return;
+    setJoining(true);
+    setError('');
+    try {
+      await makePlayer(name.trim() || randomNickname(), loadout);
+      setJoining(false);
+      onJoin();
+    } catch (err) {
+      setError('The arena is unavailable. Please try again.');
+      setJoining(false);
+    }
   }
-
-  const [vanishFlag, setVanishFlag] = useState(false);
-
-  function vanishThis(){
-    setVanishFlag(true)
-  }
-
-  function appearThis(){
-    setVanishFlag(false)
-  }
-
-  myref.current.appearThis = appearThis
-  
-  return (<div>{ !vanishFlag && <Box
-      component="form"
-      sx={{
-        width:1000,
-        height:1000,
-        '& .MuiTextField-root': { m: 1, width: '25ch' },
-      }}
-      noValidate
-      autoComplete="off"
-    >
-      <div className='center'>
-        <Box
-          component="form"
-          sx={{
-            backgroundColor: 'white',
-          }}
-        >
-          <Stack divider={<Divider orientation="vertical" flexItem />}direction="row">
-            <TextField id="outlined-basic" 
-            label="Enter name" variant="outlined" 
-            onChange = {(event)=>{setName(event.target.value)}}/>
-
-            <Box sx={{ mx: "auto",width:72}}>
-              <Button variant="outlined"
-              style={{ 
-                backgroundColor: 'rgba(200,200,255,0.5)',
-                minWidth:72,
-                minHeight:72,
-                maxWidth:72,
-                maxHeight:72
-              }}
-              onClick = {onClick}>
-                ENTER
-              </Button>
-            </Box>
-
-          </Stack>
-        </Box>
-      </div>
-    </Box>
-  }</div>
-  )
+  return <form className="join-form" onSubmit={submit}>
+    <label htmlFor="player-name">CHOOSE YOUR NAME</label>
+    <input id="player-name" placeholder="Leave blank for a random name" maxLength={18} value={name} onChange={event => setName(event.target.value)} autoComplete="off" disabled={joining}/>
+    <Loadout loadout={loadout} onChange={change} disabled={joining}/>
+    <button type="submit" disabled={disabled || joining}>{joining ? 'ENTERING…' : disabled ? 'CONNECTING…' : 'ENTER THE ARENA'}<span aria-hidden="true">↗</span></button>
+    {error && <p className="join-error" role="alert">{error}</p>}
+  </form>;
 }

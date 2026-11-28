@@ -1,48 +1,82 @@
-import {Player,Item} from './object.js'
-import {map} from './map.js'
-import {death} from './canvas.js'
-
-var ateItemid = null
-var killedPlayerid = null
-var delflag = true
-function frameUpdate(me,pKeys,myref){
-  if(me==null)return
-  if(me.dead()){map.kill(me);death(myref);return}
-  if(pKeys['w'])me.addSpeed(0,-1);
-  if(pKeys['s'])me.addSpeed(0,1);
-  if(pKeys['a'])me.addSpeed(-1,0);
-  if(pKeys['d'])me.addSpeed(1,0);
-  me.move();
-  me.sw_rot(6*(Math.PI/180))
-  map.getItems()
-  map.getPlayers()
-  map.playerUpdateBack(me)
-  map.playerUpdate(me)
-
-  for(let i=0;i<map.itemList.length;i++){
-    let item = Item.schemaItem(map.itemList[i])
-    if(me.trytoeat(item)&&ateItemid != item.id){
-      ateItemid = item.id
-      item.eaten(me)
-      map.ate(item)
+import {Player,Item} from './object';
+import {map} from './map';
+import {death} from './canvas';
+import {addEffect} from './mapdraw';
+import {updateWeapon,addKills,bladeTouches} from './skills';
+const {modifiers,offerCount}=require('./gameRules');
+const {predictPlayer}=require('./bodyPhysics');
+function gainXp(me,xp){
+  const before=me.lv,offers=offerCount(before);
+  me.xpup(xp);
+  if(me.lv>before){
+    addEffect('level',me.pos,`LEVEL ${me.lv}`);
+    // Nova: every level-up detonates around the player (the server checks it).
+    if(modifiers(me.augments).nova){me.skills.bursts.push({kind:'nova',x:me.pos.x,y:me.pos.y});addEffect('nova',me.pos,'');}
+  }
+  if(offerCount(me.lv)>offers)me.augmentMenuOpen=true;
+}
+function hitEffect(hit){
+  if(hit.burst)return addEffect(hit.burst,hit,'');
+  if(hit.smite)addEffect('smite',hit,'');
+  if(hit.burn)return addEffect(hit.killed?'kill':'burn',hit,hit.killed?'처치':`${hit.damage}`);
+  if(hit.deflect&&!hit.damage)return addEffect('deflect',hit,'');
+  if(hit.lightning)addEffect('lightning',{...hit,fromX:hit.fromX,fromY:hit.fromY},'');
+  if(hit.shockwave)return addEffect('shockwave',hit,'');
+  addEffect(hit.killed?'kill':'impact',hit,hit.killed?'처치':`${hit.damage}`);
+}
+export default function frameUpdate(me,keys,myref,now=performance.now(),dt=1/30){
+  if(!me)return;
+  if(me.dead()){map.kill(me);death(myref);return;}
+  if(me.augmentMenuOpen){map.sync(me,now);return;}
+  const mod=modifiers(me.augments);
+  const ghost=now<(me.skills.spellUntil.ghost||0);
+  let dx=Number(!!keys.ArrowRight)-Number(!!keys.ArrowLeft),dy=Number(!!keys.ArrowDown)-Number(!!keys.ArrowUp);
+  const length=Math.hypot(dx,dy);
+  if(length){
+    dx/=length;dy/=length;
+    const movement=mod.movement*(me.skills.pursuitUntil>now?1.6:1)*(ghost?1.45:1);
+    me.addSpeed(dx*dt*30*movement,dy*dt*30*movement);me.skills.facing={x:dx,y:dy};
+  }
+  me.move(dt);
+  me.impactIntent={x:me.speed.x*30,y:me.speed.y*30};
+  // Ghost walks through bodies; otherwise slide around them locally.
+  if(!ghost){
+    const obstacles=[...map.enemyMotion.sample(now+map.enemyMotion.delay),...map.playerMotion.sample(now+map.playerMotion.delay)];
+    predictPlayer(me,obstacles);
+  }
+  updateWeapon(me,now,dt);
+  for(const event of me.skills.events.splice(0))addEffect(event.type,event,'');
+  // Every drawn blade pose is sent with the next attack so the server can
+  // sweep the whole arc of every blade instead of one sampled angle.
+  me.swordPoses=me.swordPoses||[];
+  for(const blade of me.blades)me.swordPoses.push(blade);
+  if(me.swordPoses.length>400)me.swordPoses.splice(0,me.swordPoses.length-400);
+  map.sync(me,now);
+  map.attackEnemies(me,result=>{
+    result.hits.forEach(hitEffect);
+    const count=result.hits.filter(h=>h.damage>0).length,kills=result.hits.filter(h=>h.killed).length;
+    const cooldowns=me.skills.cooldowns;
+    if(mod.chain)cooldowns.accel=Math.max(performance.now(),(cooldowns.accel||0)-count*300);
+    if(mod.execute&&result.thrustKills)cooldowns.thrust=Math.max(performance.now(),(cooldowns.thrust||0)-result.thrustKills*2000);
+    addKills(me,kills,performance.now());
+    if(result.xp){addEffect('pickup',me.pos,`+${result.xp} XP`);gainXp(me,result.xp);}
+    if(result.heal)addEffect('heal',me.pos,`+${result.heal}`);
+    if(result.shieldGained)addEffect('shield',me.pos,'보호막');
+  },now);
+  for(const row of map.itemList){
+    const item=Item.schemaItem(row);
+    const touching=Math.hypot(item.pos.x-me.pos.x,item.pos.y-me.pos.y)<=me.r+item.r||
+      (mod.harvest&&me.blades.some(b=>bladeTouches(b,me.pos,me.r,{x:item.pos.x,y:item.pos.y,r:item.r})));
+    if(touching&&!map.pendingItems.has(item.id)){
+      const xp=item.xp;addEffect('pickup',item.pos,`+${xp} XP`);
+      item.init(Item.randomItem().pos);gainXp(me,xp);map.ate(item,me);
     }
   }
-
-  for(let i=0;i<map.playerList.length;i++){
-    let player = Player.schemaPlayer(map.playerList[i])
-    if(me.trytohit(player)){
-      let dmg = me.lv+5
-      map.damage(player,dmg)
-      if(player.dead() && killedPlayerid != player.id){
-        killedPlayerid = player.id
-        me.xpup(50)
-      }
+  me.lastPvpHit=me.lastPvpHit||{};
+  for(const row of map.playerList){
+    const other=Player.schemaPlayer(row);
+    if(other.hp>0&&me.trytohit(other)&&now-(me.lastPvpHit[other.id]||-Infinity)>=250){
+      me.lastPvpHit[other.id]=now;map.damage(other,Math.round((me.lv+9)*me.attackMultiplier));
     }
-  }
-  if(pKeys['q']&&pKeys['w']&&pKeys['e']&&pKeys['r'] && delflag){
-    map.deleteAll()
-    console.log('deleteall')
-    delflag = false
   }
 }
-export default frameUpdate

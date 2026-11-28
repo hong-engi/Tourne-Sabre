@@ -1,74 +1,101 @@
-import { useRef, useEffect } from 'react'
-import {Player} from './object.js'
-import draw from './mapdraw.js'
-import {map} from './map.js'
-import useInterval from '@use-it/interval'
-import frameUpdate from './frameUpdater.js'
-import socketIOClient from "socket.io-client";
+import {useRef, useEffect} from 'react';
+import {Player} from './object';
+import draw, {resetEffects, addEffect} from './mapdraw';
+import {map} from './map';
+import frameUpdate from './frameUpdater';
+import socketIOClient from 'socket.io-client';
+import {bindGameInput} from './input';
+import {createSkills, activate, skillSnapshot} from './skills';
+const {offerCount,DEFAULT_SPELLS,DEFAULT_SKILLS}=require('./gameRules');
 
-const socket = socketIOClient("http://localhost:8081", {  
-  cors: {
-  origin: "http://localhost:8081",
-  credentials: true},
-  transports : ['websocket']} 
-);
-
-var player = null
-const makePlayer = (name) => {
-  player = new Player(name);
-  map.addPlayer(player);
-  socket.emit("newplayer",player.id)
+const socket = socketIOClient('http://localhost:8081', {transports: ['websocket']});
+let player = null;
+const makePlayer = async (name, loadout={skills:DEFAULT_SKILLS,spells:DEFAULT_SPELLS}) => {
+  const next = new Player(name);
+  next.loadout = [...loadout.skills];
+  next.spells = [...loadout.spells];
+  next.skills = createSkills();
+  next.augmentMenuOpen=false;
+  map.reset();
+  map.onBlast=blast=>addEffect('bomb',blast,'');
+  await map.addPlayer(next);
+  player = next;
+  resetEffects();
+  socket.emit('newplayer', player.id);
+};
+function death(myref) {
+  const result = player && {lv: player.lv, xp: player.xp};
+  player = null;
+  resetEffects();
+  myref.current.appearThis(result);
 }
 
-function death(myref){
-  player=null
-  myref.current.appearThis()
+export function activateSkill(code) {
+  if (!player) return;
+  const from={x:player.pos.x,y:player.pos.y};
+  const cast=activate(player, code, performance.now());
+  if (cast==='blink') {addEffect('blink',from,'');addEffect('blink',player.pos,'');}
+  if (cast==='ghost') addEffect('ghost',player.pos,'유체화');
+  if (cast==='slam') addEffect('slam',from,'');
+  if (cast==='turret') addEffect('turret',from,'');
+  if (cast==='ignite') addEffect('ignite',player.pos,'점화');
+  if (cast==='exhaust') addEffect('exhaust',player.pos,'탈진');
+  // Spells whose effect the server owns.
+  if (['heal','barrier','ignite','exhaust','smite'].includes(cast)) {
+    const current=player,before=current.hp;
+    map.castSpell(current,cast).then(()=>{
+      if (cast==='heal') addEffect('heal',current.pos,`+${Math.max(0,current.hp-before)}`);
+      if (cast==='barrier') addEffect('shield',current.pos,'방벽');
+    }).catch(err=>console.warn('Spell:',err.message));
+  }
 }
-
-const Canvas = props => {
-  const canvasRef = useRef(null)
-  const fps = 30;
-  var pressedKeys = {};
-
-  function handleKeyDown(event){
-    pressedKeys[event.key] = true;
-  } 
-  function handleKeyUp(event){
-    delete pressedKeys[event.key]
-  } 
-
+export function setAugmentMenu(open) {
+  if(player)player.augmentMenuOpen=open;
+}
+export async function chooseAugment(id) {
+  if(!player)return;
+  const current=player;
+  await map.chooseAugment(current,id);
+  current.augmentMenuOpen=current.augments.length<offerCount(current.lv);
+  addEffect('level',current.pos,'증강 획득');
+}
+export async function rerollAugment(index) {
+  if(player)await map.rerollAugment(player,index);
+}
+export default function Canvas({myref, onStatus}) {
+  const canvasRef = useRef(null);
   useEffect(() => {
-    window.addEventListener('keydown', handleKeyDown);
-    window.addEventListener('keyup',handleKeyUp)
-    return () => {
-      console.log('removing keyboard')
-      window.removeEventListener('keydown', handleKeyDown);
-      window.removeEventListener('keyup',handleKeyUp)
+    const canvas = canvasRef.current;
+    const ctx = canvas.getContext('2d');
+    let size = {width: 0, height: 0, dpr: 1};
+    let animation;
+    let previousTime;
+    const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
+    const resize = () => {
+      size = {width: window.innerWidth, height: window.innerHeight, dpr: Math.min(window.devicePixelRatio || 1, 2)};
+      canvas.width = Math.round(size.width * size.dpr);
+      canvas.height = Math.round(size.height * size.dpr);
     };
-  }, []);
-
-  useInterval(()=>{if(player)frameUpdate(player,pressedKeys,props.myref);},1000/fps)
-
-  useEffect(() => {
-  
-    const canvas = canvasRef.current
-    const ctx = canvas.getContext('2d')
-    let animationFrameId
-    
-    const render = () => {
-      draw(ctx, player)
-      animationFrameId = window.requestAnimationFrame(render)
-    }
-
-    render()
-
+    const input = bindGameInput(window, () => !!player && !player.augmentMenuOpen, activateSkill);
+    resize();
+    window.addEventListener('resize', resize);
+    const status = setInterval(() => onStatus(player ? {name: player.name, hp: player.hp, hpmax: player.hpmax, xp: player.xp, lv: player.lv, skills: skillSnapshot(player, performance.now()), direction:player.skills.direction, enemies:map.enemyList.length, augments:[...player.augments], augmentMenuOpen:player.augmentMenuOpen, augmentOffer:player.augmentOffer||null, spells:player.spells, threat:map.threat} : null, socket.connected), 100);
+    const render = time => {
+      const dt=previousTime===undefined?1/60:Math.min(1/30,Math.max(0,(time-previousTime)/1000));
+      previousTime=time;
+      if(player)frameUpdate(player,input.keys,myref,time,dt);
+      ctx.setTransform(size.dpr, 0, 0, size.dpr, 0, 0);
+      draw(ctx, player, size, time, reducedMotion.matches);
+      animation = window.requestAnimationFrame(render);
+    };
+    animation = window.requestAnimationFrame(render);
     return () => {
-      window.cancelAnimationFrame(animationFrameId)
-    }
-  }, [draw])
-  
-  return <canvas ref={canvasRef} {...props}/>
+      cancelAnimationFrame(animation);
+      clearInterval(status);
+      window.removeEventListener('resize', resize);
+      input.dispose();
+    };
+  }, [myref, onStatus]);
+  return <canvas ref={canvasRef} className="arena-canvas" id="gameboard" aria-label="Game arena. Use arrow keys to move and Q W E R for skills, including with a Korean keyboard."/>;
 }
-
-export default Canvas
-export {makePlayer,death}
+export {makePlayer, death};

@@ -1,0 +1,292 @@
+{
+  "reverse": {
+    "cols": 97,
+    "rows": 92,
+    "step_x": 12.9471,
+    "step_y": 13.639,
+    "consensus": "arbitrated",
+    "confidence": "medium",
+    "detect_s": 4.657,
+    "recon_s": 1.197,
+    "source_size": [
+      1254,
+      1254
+    ],
+    "content_size": [
+      62,
+      71
+    ],
+    "native_size": [
+      73,
+      73
+    ],
+    "visible_colors": 12,
+    "alpha": [
+      0,
+      255
+    ],
+    "file": "reverse.png",
+    "options": {}
+  },
+  "giant": {
+    "cols": 148,
+    "rows": 149,
+    "step_x": 8.4782,
+    "step_y": 8.3934,
+    "consensus": "arbitrated",
+    "confidence": "medium",
+    "detect_s": 4.839,
+    "recon_s": 1.497,
+    "source_size": [
+      1254,
+      1254
+    ],
+    "content_size": [
+      122,
+      127
+    ],
+    "native_size": [
+      129,
+      129
+    ],
+    "visible_colors": 16,
+    "alpha": [
+      0,
+      255
+    ],
+    "file": "giant.png",
+    "options": {}
+  },
+  "accel": {
+    "cols": 165,
+    "rows": 105,
+    "step_x": 7.6141,
+    "step_y": 11.9788,
+    "consensus": "arbitrated",
+    "confidence": "medium",
+    "detect_s": 4.268,
+    "recon_s": 1.438,
+    "source_size": [
+      1254,
+      1254
+    ],
+    "content_size": [
+      128,
+      81
+    ],
+    "native_size": [
+      130,
+      130
+    ],
+    "visible_colors": 16,
+    "alpha": [
+      0,
+      255
+    ],
+    "file": "accel.png",
+    "options": {}
+  },
+  "thrust": {
+    "cols": 152,
+    "rows": 146,
+    "step_x": 8.3271,
+    "step_y": 8.5242,
+    "consensus": "arbitrated",
+    "confidence": "medium",
+    "detect_s": 3.78,
+    "recon_s": 1.526,
+    "source_size": [
+      1262,
+      1246
+    ],
+    "content_size": [
+      140,
+      46
+    ],
+    "native_size": [
+      142,
+      142
+    ],
+    "visible_colors": 15,
+    "alpha": [
+      0,
+      255
+    ],
+    "file": "thrust.png",
+    "options": {}
+  },
+  "blink": {
+    "cols": 97,
+    "rows": 98,
+    "step_x": 12.8648,
+    "step_y": 12.8339,
+    "consensus": "arbitrated",
+    "confidence": "medium",
+    "detect_s": 4.3,
+    "recon_s": 0.976,
+    "source_size": [
+      1254,
+      1254
+    ],
+    "content_size": [
+      76,
+      75
+    ],
+    "native_size": [
+      78,
+      78
+    ],
+    "visible_colors": 12,
+    "alpha": [
+      0,
+      255
+    ],
+    "file": "blink.png",
+    "options": {}
+  },
+  "ghost": {
+    "cols": 130,
+    "rows": 122,
+    "step_x": 9.6534,
+    "step_y": 10.2752,
+    "consensus": "arbitrated",
+    "confidence": "medium",
+    "detect_s": 4.059,
+    "recon_s": 0.832,
+    "source_size": [
+      1254,
+      1254
+    ],
+    "content_size": [
+      95,
+      92
+    ],
+    "native_size": [
+      97,
+      97
+    ],
+    "visible_colors": 12,
+    "alpha": [
+      0,
+      255
+    ],
+    "file": "ghost.png",
+    "options": {}
+  },
+  "heal": {
+    "cols": 92,
+    "rows": 76,
+    "step_x": 13.6792,
+    "step_y": 16.5845,
+    "consensus": "arbitrated",
+    "confidence": "medium",
+    "detect_s": 4.14,
+    "recon_s": 0.955,
+    "source_size": [
+      1254,
+      1254
+    ],
+    "content_size": [
+      77,
+      66
+    ],
+    "native_size": [
+      79,
+      79
+    ],
+    "visible_colors": 14,
+    "alpha": [
+      0,
+      255
+    ],
+    "file": "heal.png",
+    "options": {}
+  },
+  "dash": {
+    "cols": 103,
+    "rows": 99,
+    "step_x": 12.2265,
+    "step_y": 12.683,
+    "consensus": "arbitrated",
+    "confidence": "medium",
+    "detect_s": 4.094,
+    "recon_s": 1.374,
+    "source_size": [
+      1254,
+      1254
+    ],
+    "content_size": [
+      92,
+      51
+    ],
+    "native_size": [
+      94,
+      94
+    ],
+    "visible_colors": 15,
+    "alpha": [
+      0,
+      255
+    ],
+    "file": "dash.png",
+    "options": {}
+  },
+  "twinBlade": {
+    "cols": 146,
+    "rows": 145,
+    "step_x": 8.5952,
+    "step_y": 8.6595,
+    "consensus": "arbitrated",
+    "confidence": "medium",
+    "detect_s": 4.647,
+    "recon_s": 1.739,
+    "source_size": [
+      1254,
+      1254
+    ],
+    "content_size": [
+      116,
+      112
+    ],
+    "native_size": [
+      118,
+      118
+    ],
+    "visible_colors": 15,
+    "alpha": [
+      0,
+      255
+    ],
+    "file": "twin-blade.png",
+    "options": {}
+  },
+  "turret": {
+    "cols": 182,
+    "rows": 188,
+    "step_x": 6.9061,
+    "step_y": 6.6867,
+    "consensus": "arbitrated",
+    "confidence": "medium",
+    "detect_s": 4.0,
+    "recon_s": 1.618,
+    "source_size": [
+      1254,
+      1254
+    ],
+    "content_size": [
+      92,
+      159
+    ],
+    "native_size": [
+      161,
+      161
+    ],
+    "visible_colors": 15,
+    "alpha": [
+      0,
+      255
+    ],
+    "file": "turret.png",
+    "options": {}
+  }
+}

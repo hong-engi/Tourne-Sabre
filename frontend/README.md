@@ -1,70 +1,59 @@
-# Getting Started with Create React App
+# Tourne / Sabre
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+React canvas arena with server-managed AI opponents. Commands below run from the repository root.
 
-## Available Scripts
+Pixel artwork follows the [ImageGen → Pixel Art Fixer → 16-color workflow](../PIXEL_ART_WORKFLOW.md). The guide covers source preservation, conversion commands, integration, and visual checks. The [16 skill/spell icons](art-source/skill-icons/README.md) include retained sources, prompts, conversion metadata, and a HUD-size preview.
 
-In the project directory, you can run:
+## Run locally
 
-### `npm start`
+- `npm start --prefix backend`: API `8080`, Socket.IO `8081`.
+- `BROWSER=none NODE_OPTIONS=--openssl-legacy-provider npm start --prefix frontend`: UI `3000`; the OpenSSL option supports the existing react-scripts 4 toolchain on newer Node versions.
+- Backend MongoDB defaults to `mongodb://127.0.0.1:27017/tourne_sabre_local`; override with `MONGODB_URI`. Startup resets players/items, so use disposable data.
 
-Runs the app in the development mode.\
-Open [http://localhost:3000](http://localhost:3000) to view it in the browser.
+## Controls
 
-The page will reload if you make edits.\
-You will also see any lint errors in the console.
+| Input | Action | Duration | Cooldown |
+| --- | --- | --- | --- |
+| Arrow keys | Move (diagonals normalized) | Held | — |
+| Q | Reverse sword rotation | Until next reversal | 0.9s |
+| W | Larger blade, increased damage | 3s | 8s |
+| E | 2.6× rotation speed | 2.4s | 7s |
+| R | Thrust along the sword angle captured on R press, increased damage | 0.35s | 3.5s |
 
-### `npm test`
+Skills can stack. The HUD uses mint/check marks for ready skills, gold with a shrinking duration bar while active, and dark blue with a large countdown while recharging. Q has a brief 0.3s cast indicator. Cooldown meters use augmentation-adjusted durations; twin thrust shows its remaining charges. Input uses physical `KeyboardEvent.code` (`KeyQ` etc.), including when Korean IME reports `ㅂ/ㅈ/ㄷ/ㄱ`. Text fields and browser shortcuts are excluded; held keys do not repeatedly cast skills. Losing focus clears movement. The old QWER database-clear shortcut has been removed.
 
-Launches the test runner in the interactive watch mode.\
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
+## AI opponents
 
-### `npm run build`
+- **검투사:** approaches/orbits with a rotating blade.
+- **돌격수:** locks a visible charge destination for 0.85s, charges toward it, then recovers for 1.1s. The lane ends at that fixed world destination and shrinks as the monster advances; travel is capped to avoid overshooting, including at arena edges.
+- **추적자:** fast flanking movement and contact attacks.
 
-Builds the app for production to the `build` folder.\
-It correctly bundles React in production mode and optimizes the build for the best performance.
+The server spawns three archetypes near active players and replenishes enemies up to a population cap. Enemy health, movement, hit cooldowns, contact invulnerability, and kill results are resolved on the server. The client receives hit/XP results and displays feedback. The existing multiplayer movement and progression remain client-driven; this is not a fully authoritative competitive server.
 
-The build is minified and the filenames include the hashes.\
-Your app is ready to be deployed!
+## Levels and augmentations
 
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
+Every level grants +10 maximum/current health and +1 base attack. Level thresholds use `50 × (level − 1)²` total XP. Body collision stays circular with a fixed radius of 25.
 
-### `npm run eject`
+Levels 3, 6, 9, 12, 15, then every three levels grant one choice. Use the augmentation button beside the bottom XP bar to open the tree. The four trees (폭풍/거신/관통/불굴) contain 20 nodes, with prerequisites, base-node rank limits, and at most one ultimate per run. Ultimate choices begin with the fifth offer (level 15). The server validates and saves choices for the current run; a new run starts fresh.
 
-**Note: this is a one-way operation. Once you `eject`, you can’t go back!**
+The tree opens automatically when a new offer is earned. Movement/attacks stop while it is open; that player is protected and ignored by AI. When every living player is choosing, the AI room freezes. Close the tree to defer a choice. Escape closes it; keyboard focus stays inside the dialog.
 
-If you aren’t satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
+`src/gameRules.js` contains pure rules consumed by both the React client and the backend. `backend/src/game/progression.js` persists choices, level health increases, pickup healing, shields, and one-use last stand. AI hit resolution applies tip damage, knockback, reversal charges, shockwaves, pull, and kill-based rewards. QWER timers apply length, speed, duration, cooldown, pursuit, and two-charge thrust effects.
 
-Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you’re on your own.
+## Rendering and feedback
 
-You don’t have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn’t feel obligated to use this feature. However we understand that this tool wouldn’t be useful if you couldn’t customize it when you are ready for it.
+The local player updates with display frames using time-based movement. Remote positions and sword angles interpolate through a 120ms snapshot buffer; extrapolation during jitter is capped at 100ms. The buffer is visual only. Player nicknames use plain text, without panels or quote-like borders; AI monsters have no nameplates. No body hitbox outlines are rendered. Collision geometry is unchanged by visual interpolation.
 
-## Learn More
+Confirmed hits emit sparks, a brief white flash, small visual recoil, and floating damage; kills, level-ups, shields, and shockwaves have distinct bursts. Camera shake is bounded to a few pixels. Reduced-motion settings disable shake, flashes, and particle motion. UI/text remain at display resolution.
 
-You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
+## Checks
 
-To learn React, check out the [React documentation](https://reactjs.org/).
+- `CI=true npm test --prefix frontend -- --watchAll=false`
+- `npm test --prefix backend`
+- `NODE_OPTIONS=--openssl-legacy-provider npm run build --prefix frontend`
 
-### Code Splitting
+Manual verification: arrow movement, Q reversal, stacked W/E, forward R thrust, AI pursuit/charge warning, player damage, enemy kill XP, and death/re-entry. Korean physical-key behavior is covered by composing `KeyboardEvent` tests; OS IME switching is not automated.
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/code-splitting](https://facebook.github.io/create-react-app/docs/code-splitting)
+Skill visuals: Q draws a direction-change arrow, W adds gold blade-edge light, E draws mint rotational streaks, and R uses a straight violet trail along the captured sword angle. Thrust freezes that angle throughout extension and retraction, then resumes normal rotation; its afterimages are linear rather than rotational. Reduced motion disables cast bursts and extra wind trails.
 
-### Analyzing the Bundle Size
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size](https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size)
-
-### Making a Progressive Web App
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app](https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app)
-
-### Advanced Configuration
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/advanced-configuration](https://facebook.github.io/create-react-app/docs/advanced-configuration)
-
-### Deployment
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/deployment](https://facebook.github.io/create-react-app/docs/deployment)
-
-### `npm run build` fails to minify
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify](https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify)
+AI entities have no `name` fields in server snapshots, and the player-name renderer explicitly rejects AI entities. Charge-lane geometry uses the same server destination as movement; interpolation/extrapolation preserves that endpoint, and visual hit recoil does not shift the ground warning.

@@ -1,0 +1,26 @@
+{
+  "cols": 182,
+  "rows": 179,
+  "step_x": 6.9264,
+  "step_y": 6.9675,
+  "consensus": "arbitrated",
+  "confidence": "medium",
+  "detect_s": 5.007,
+  "recon_s": 1.85,
+  "source_size": [
+    1261,
+    1247
+  ],
+  "options": {},
+  "native_size": [
+    148,
+    147
+  ],
+  "visible_colors": 16,
+  "alpha": [
+    0,
+    255
+  ],
+  "fixer_commit": "ef376e57e1c272633ca2dbf5f29ec3fcf6596465",
+  "file": "frontend/src/assets/pixel/sword-turret-base.png"
+}
