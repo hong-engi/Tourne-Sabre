@@ -1,0 +1,42 @@
+{
+  "forge": {
+    "removed": [],
+    "final_size": [
+      69,
+      100
+    ],
+    "visible_colors": 16
+  },
+  "maestro": {
+    "removed": [],
+    "final_size": [
+      67,
+      100
+    ],
+    "visible_colors": 16
+  },
+  "rootcrown": {
+    "removed": [],
+    "final_size": [
+      89,
+      100
+    ],
+    "visible_colors": 16
+  },
+  "stormray": {
+    "removed": [],
+    "final_size": [
+      100,
+      90
+    ],
+    "visible_colors": 16
+  },
+  "centipede": {
+    "removed": [],
+    "final_size": [
+      80,
+      100
+    ],
+    "visible_colors": 15
+  }
+}

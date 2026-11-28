@@ -12,6 +12,20 @@ import stalkerUrl from './assets/pixel/stalker.png';
 import houndUrl from './assets/pixel/hound.png';
 import swordsaintUrl from './assets/pixel/swordsaint.png';
 import crabUrl from './assets/pixel/crab.png';
+import forgeUrl from './assets/pixel/forge.png';
+import maestroUrl from './assets/pixel/maestro.png';
+import rootcrownUrl from './assets/pixel/rootcrown.png';
+import stormrayUrl from './assets/pixel/stormray.png';
+import centipedeUrl from './assets/pixel/centipede.png';
+import wardenUrl from './assets/pixel/warden.png';
+import gatekeeperUrl from './assets/pixel/gatekeeper.png';
+import duelistUrl from './assets/pixel/duelist.png';
+import alchemistUrl from './assets/pixel/alchemist.png';
+import sicklerUrl from './assets/pixel/sickler.png';
+import shroomUrl from './assets/pixel/shroom.png';
+import lanternUrl from './assets/pixel/lantern.png';
+import leechUrl from './assets/pixel/leech.png';
+import bellUrl from './assets/pixel/bell.png';
 import sabreUrl from './assets/pixel/sabre.png';
 import turretBaseUrl from './assets/pixel/sword-turret-base.png';
 import {XP_PICKUPS, getXpPickup} from './xpPickups';
@@ -25,10 +39,13 @@ const {ringRadius}=require('./hazardGeometry');
 const {bookVisuals}=require('./skillCasts');
 
 const sprites = {};
-Object.entries({knight: knightUrl, enemy: enemyUrl, charger: chargerUrl, shellback: shellbackUrl, lancer: lancerUrl, lancerSpear: lancerSpearUrl, flea: fleaUrl, banner: bannerUrl, stalker: stalkerUrl, hound: houndUrl, swordsaint: swordsaintUrl, crab: crabUrl, sabre: sabreUrl, turretBase: turretBaseUrl, floor: floorUrl, ...Object.fromEntries(XP_PICKUPS.map(tier => [tier.key,tier.url]))}).forEach(([key, url]) => {
+Object.entries({knight: knightUrl, enemy: enemyUrl, charger: chargerUrl, shellback: shellbackUrl, lancer: lancerUrl, lancerSpear: lancerSpearUrl, flea: fleaUrl, banner: bannerUrl, stalker: stalkerUrl, hound: houndUrl, swordsaint: swordsaintUrl, crab: crabUrl, forge: forgeUrl, maestro: maestroUrl, rootcrown: rootcrownUrl, stormray: stormrayUrl, centipede: centipedeUrl, warden: wardenUrl, gatekeeper: gatekeeperUrl, duelist: duelistUrl, alchemist: alchemistUrl, sabre: sabreUrl, turretBase: turretBaseUrl, floor: floorUrl, ...Object.fromEntries(XP_PICKUPS.map(tier => [tier.key,tier.url]))}).forEach(([key, url]) => {
   const img = new Image();
   img.src = url;
   sprites[key] = img;
+});
+Object.entries({sickler:sicklerUrl,shroom:shroomUrl,lantern:lanternUrl,leech:leechUrl,bell:bellUrl}).forEach(([key,url])=>{
+  const img=new Image(); img.src=url; sprites[key]=img;
 });
 // Enlarge the source pixel art once with nearest-neighbor sampling. Transform
 // those prepared sprites at display resolution so rotation does not re-sample
@@ -233,6 +250,7 @@ function dashArc(ctx,p){
   crescent(start,now,'#fff6d855');
   ctx.restore();
 }
+const actorFacing=new Map();
 function actor(ctx, p, own, x, y, time, reduced) {
   ctx.save(); ctx.translate(x, y);
   const recoil=effects.find(fx=>fx.targetId===p.id&&['impact','kill'].includes(fx.type)&&time-fx.born<150);
@@ -246,7 +264,12 @@ function actor(ctx, p, own, x, y, time, reduced) {
   const ghost=own&&p.combatState?.ghost;
   if(ghost){circle(ctx,0,0,p.r+8,'#7fe3ff22','#9eeaffaa',1.5);ctx.globalAlpha=.5;}
   if(flashed)ctx.filter='brightness(2.8) saturate(.3)';
-  if (p.speed.x < -.5) {
+  const flipThresh=own?.5:25;
+  let faceLeft=actorFacing.get(p.id)||false;
+  if(p.speed.x<-flipThresh)faceLeft=true;
+  else if(p.speed.x>flipThresh)faceLeft=false;
+  actorFacing.set(p.id,faceLeft);
+  if (faceLeft) {
     ctx.save(); ctx.scale(-1, 1); sprite(ctx, own ? 'knight' : 'enemy', -width / 2, -height / 2 - step, width, height); ctx.restore();
   } else sprite(ctx, own ? 'knight' : 'enemy', -width / 2, -height / 2 - step, width, height);
   if(flashed)ctx.filter='none';
@@ -255,7 +278,8 @@ function actor(ctx, p, own, x, y, time, reduced) {
   // Ignite: the player's blades burn.
   if(own&&p.combatState?.ignite&&!reduced){ctx.shadowColor='#ff7a2a';ctx.shadowBlur=14+4*Math.sin(time/70);}
   if(own){dashArc(ctx,p);extraBlades(ctx,p,time,reduced);}
-  blade(ctx, p, time, reduced);
+  if(!own){ctx.save();ctx.filter='sepia(.9) saturate(3.5) hue-rotate(-38deg) brightness(.95)';blade(ctx, p, time, reduced);ctx.restore();}
+  else blade(ctx, p, time, reduced);
   ctx.shadowBlur=0;
   const health = Math.max(0, Math.min(1, p.hp / p.hpmax));
   ctx.fillStyle = '#061018'; ctx.fillRect(-27, height / 2 + 10, 54, 7);
@@ -514,12 +538,12 @@ function drawEnemy(ctx, raw, me, size, time, reduced) {
   if(e.type==='herald'&&e.phase==='signal'){ctx.fillStyle='#ff6a3a55';ctx.fillRect(x-4,y-160,8,160-e.r);}
   ctx.save(); ctx.translate(x,y);
   const lane=chargeTelegraph(e);
-  if(lane && lane.length>.5){
+  if(lane && lane.length>.5 && e.phase==='windup'){
     ctx.save(); ctx.rotate(lane.angle);
-    arrowPath(ctx,lane.length,e.r*1.8);
-    ctx.fillStyle = e.phase === 'windup' ? '#f18b6b28' : '#ffd28818';
+    arrowPath(ctx,lane.length+e.r,e.r*1.8);
+    ctx.fillStyle = '#f18b6b28';
     ctx.fill();
-    ctx.strokeStyle = e.phase === 'windup' ? '#ffb28b' : '#f4da9c'; ctx.lineWidth = 1.6;
+    ctx.strokeStyle = '#ffb28b'; ctx.lineWidth = 1.6;
     ctx.setLineDash([8,7]); ctx.stroke(); ctx.setLineDash([]);
     ctx.restore();
   }

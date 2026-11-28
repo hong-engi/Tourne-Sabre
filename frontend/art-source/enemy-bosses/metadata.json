@@ -1,0 +1,57 @@
+{
+  "forge": {
+    "source_crop": [
+      805,
+      1187
+    ],
+    "force_step": 12.364583333333334,
+    "native_size": [
+      65,
+      96
+    ]
+  },
+  "maestro": {
+    "source_crop": [
+      756,
+      1145
+    ],
+    "force_step": 11.927083333333334,
+    "native_size": [
+      63,
+      96
+    ]
+  },
+  "rootcrown": {
+    "source_crop": [
+      1006,
+      1138
+    ],
+    "force_step": 11.854166666666666,
+    "native_size": [
+      85,
+      96
+    ]
+  },
+  "stormray": {
+    "source_crop": [
+      1116,
+      998
+    ],
+    "force_step": 11.625,
+    "native_size": [
+      96,
+      86
+    ]
+  },
+  "centipede": {
+    "source_crop": [
+      700,
+      886
+    ],
+    "force_step": 9.229166666666666,
+    "native_size": [
+      76,
+      96
+    ]
+  }
+}

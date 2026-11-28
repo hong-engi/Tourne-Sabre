@@ -1,0 +1,46 @@
+{
+  "warden": {
+    "source_crop": [
+      910,
+      1076
+    ],
+    "force_step": 16.8125,
+    "native_size": [
+      54,
+      64
+    ]
+  },
+  "gatekeeper": {
+    "source_crop": [
+      965,
+      1111
+    ],
+    "force_step": 17.359375,
+    "native_size": [
+      56,
+      64
+    ]
+  },
+  "duelist": {
+    "source_crop": [
+      871,
+      1203
+    ],
+    "force_step": 18.796875,
+    "native_size": [
+      46,
+      64
+    ]
+  },
+  "alchemist": {
+    "source_crop": [
+      1016,
+      1108
+    ],
+    "force_step": 17.3125,
+    "native_size": [
+      59,
+      64
+    ]
+  }
+}

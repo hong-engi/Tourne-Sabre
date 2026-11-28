@@ -693,6 +693,7 @@ class EnemyArena {
     for(const event of result.events){
       if(!(event.amount>0)||!this.tryHit(event.id,event.sourceId,now))continue;
       const player=players.find(p=>String(p._id)===event.id),e=this.enemies.find(e=>e.id===event.sourceId);
+      if(e&&e.type==='stalker')e.ramp=0;
       damage.push({id:event.id,amount:e?this.outgoing(e,event.amount,now):event.amount,source:e?`${e.type}:contact`:'contact'});
       const mod=player&&modifiers(player.augments);
       // Thorns hit back with a multiple of the player's own attack power.

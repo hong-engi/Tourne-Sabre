@@ -1,0 +1,57 @@
+{
+  "sickler": {
+    "source_crop": [
+      837,
+      1012
+    ],
+    "force_step": 15.8125,
+    "native_size": [
+      53,
+      64
+    ]
+  },
+  "shroom": {
+    "source_crop": [
+      1007,
+      986
+    ],
+    "force_step": 15.734375,
+    "native_size": [
+      64,
+      63
+    ]
+  },
+  "lantern": {
+    "source_crop": [
+      790,
+      1078
+    ],
+    "force_step": 16.84375,
+    "native_size": [
+      47,
+      64
+    ]
+  },
+  "leech": {
+    "source_crop": [
+      595,
+      1119
+    ],
+    "force_step": 17.484375,
+    "native_size": [
+      34,
+      64
+    ]
+  },
+  "bell": {
+    "source_crop": [
+      866,
+      1146
+    ],
+    "force_step": 17.90625,
+    "native_size": [
+      48,
+      64
+    ]
+  }
+}

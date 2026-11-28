@@ -1,0 +1,42 @@
+{
+  "sickler": {
+    "removed": [],
+    "final_size": [
+      57,
+      68
+    ],
+    "visible_colors": 15
+  },
+  "shroom": {
+    "removed": [],
+    "final_size": [
+      68,
+      67
+    ],
+    "visible_colors": 16
+  },
+  "lantern": {
+    "removed": [],
+    "final_size": [
+      51,
+      68
+    ],
+    "visible_colors": 16
+  },
+  "leech": {
+    "removed": [],
+    "final_size": [
+      38,
+      68
+    ],
+    "visible_colors": 16
+  },
+  "bell": {
+    "removed": [],
+    "final_size": [
+      52,
+      68
+    ],
+    "visible_colors": 16
+  }
+}

@@ -6,7 +6,7 @@
 - 서버 행동·판정: [backend/src/game/bestiary.js](backend/src/game/bestiary.js)(신규 적), [backend/src/game/enemies.js](backend/src/game/enemies.js)(공용 시스템·기존 적)
 - 경고 판정 형상(서버·클라 공용): [frontend/src/hazardGeometry.js](frontend/src/hazardGeometry.js)
 - 렌더링: [frontend/src/mapdraw.js](frontend/src/mapdraw.js), 스프라이트 [frontend/src/enemyArt.js](frontend/src/enemyArt.js), 이름 [frontend/src/enemyNames.js](frontend/src/enemyNames.js)
-- **적 도감 UI**: `http://localhost:3001/?lab` (개발 서버는 :3000). 모든 적이 실제 서버 AI로 움직이며, 적마다 수정 메모(메모/수정 요청/반영됨)를 남기면 [ENEMY_NOTES.json](ENEMY_NOTES.json)에 저장된다. 코드: [frontend/src/EnemyLab.js](frontend/src/EnemyLab.js), [backend/src/game/lab.js](backend/src/game/lab.js)
+- **적 도감 UI**: `http://localhost:3001/?lab` (개발 서버는 :3000). 몬스터를 클릭하면 해당 적과 **직접 조작(방향키·QWER)으로 전투**하며 테스트할 수 있고(봉합 수도사·깃발 운반꾼 등 지원형은 아군과 함께 등장), 수정 메모는 [ENEMY_NOTES.json](ENEMY_NOTES.json)에 저장된다. 코드: [frontend/src/EnemyLab.js](frontend/src/EnemyLab.js), [backend/src/game/lab.js](backend/src/game/lab.js)
 - 테스트: [backend/src/game/bestiary.test.js](backend/src/game/bestiary.test.js), [frontend/src/hazardGeometry.test.js](frontend/src/hazardGeometry.test.js)
 
 ## 1. 공통 규칙

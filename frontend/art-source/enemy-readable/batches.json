@@ -1,0 +1,8 @@
+[
+  {"name":"elite","sprites":{"warden":64,"gatekeeper":64,"duelist":64,"alchemist":64}},
+  {"name":"normal-a","sprites":{"sickler":64,"shroom":64,"lantern":64,"leech":64,"bell":64}},
+  {"name":"normal-b","sprites":{"mender":64,"brood":64,"thief":64,"magnet":64,"seeder":64,"roller":64,"shotbug":64}},
+  {"name":"normal-c","sprites":{"skeleton":64,"salamander":64,"sculptor":64,"herald":64,"balloon":64,"snail":64,"masker":64}},
+  {"name":"parts-a","sprites":{"segment":40,"egg":40,"pillar":40,"debris":40,"balloonPart":40}},
+  {"name":"parts-b","sprites":{"stake":40,"knot":40,"resobell":40,"cannon":40}}
+]
