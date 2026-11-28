@@ -309,7 +309,8 @@ function actor(ctx, p, own, x, y, time, reduced) {
   if(flashed)ctx.filter='brightness(2.8) saturate(.3)';
   const flipThresh=own?.5:25;
   let faceLeft=actorFacing.get(p.id)||false;
-  if(p.speed.x<-flipThresh)faceLeft=true;
+  if(p.fixedFacing)faceLeft=false;
+  else if(p.speed.x<-flipThresh)faceLeft=true;
   else if(p.speed.x>flipThresh)faceLeft=false;
   actorFacing.set(p.id,faceLeft);
   if (faceLeft) {
@@ -569,7 +570,7 @@ function drawEnemy(ctx, raw, me, size, time, reduced) {
   const x = size.width/2 + e.x - me.pos.x, y = size.height/2 + e.y - me.pos.y;
   if (x < -400 || x > size.width+400 || y < -400 || y > size.height+400) return;
   if (e.type === 'spinner') {
-    actor(ctx, {id:e.id,pos:{x:e.x,y:e.y},r:e.r,hp:e.hp,hpmax:e.hpmax,speed:{x:e.vx,y:e.vy},sw_angle:e.angle,sw_r:42,sw_w:22,sw_h:70}, false, x, y, time, reduced);
+    actor(ctx, {id:e.id,pos:{x:e.x,y:e.y},r:e.r,hp:e.hp,hpmax:e.hpmax,fixedFacing:true,speed:{x:e.vx,y:e.vy},sw_angle:e.angle,sw_r:42,sw_w:22,sw_h:70}, false, x, y, time, reduced);
     return;
   }
   enemySprites();
@@ -700,6 +701,12 @@ function drawEnemy(ctx, raw, me, size, time, reduced) {
     }
   }
   ctx.save();
+  if(!reduced&&e.hopProgress!=null&&e.hopProgress<1){
+    const t=e.hopProgress,lift=Math.sin(t*Math.PI);
+    const squash=Math.cos(t*Math.PI*3)*(1-t)*.16;
+    ctx.translate(0,-lift*(e.type==='mite'?7:11));
+    ctx.scale(1+squash,1-squash);
+  }
   const aiming=(e.type==='charger'&&e.phase!=='hunt')||e.type==='spitter';
   const moving=Math.hypot(e.vx||0,e.vy||0)>1;
   // Turning enemies show their real facing; attackers face their locked aim.

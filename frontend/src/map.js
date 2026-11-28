@@ -3,6 +3,47 @@ import {MotionBuffer} from './motion';
 import {API_ORIGIN} from './apiConfig';
 const {modifiers,stats}=require('./gameRules');
 const api=axios.create({baseURL:`${API_ORIGIN}/map`,timeout:3000});
+
+export function compactPlayerSync(player){
+  return {
+    id:player.id,
+    pos:{x:player.pos.x,y:player.pos.y},
+    speed:{x:player.speed.x,y:player.speed.y},
+    impactIntent:player.impactIntent?{x:player.impactIntent.x,y:player.impactIntent.y}:undefined,
+    sw_angle:player.sw_angle,
+    sw_r:player.sw_r,
+    sw_w:player.sw_w,
+    sw_h:player.sw_h,
+    sw_speed:player.sw_speed,
+    combatState:player.combatState||{},
+    augmentMenuOpen:!!player.augmentMenuOpen,
+    xp:player.xp,
+    physicsAck:player.physicsAck,
+  };
+}
+
+function compactPlayerJoin(player){
+  return {
+    id:player.id,
+    name:player.name,
+    pos:{x:player.pos.x,y:player.pos.y},
+    speed:{x:player.speed.x,y:player.speed.y},
+    r:player.r,
+    sw_angle:player.sw_angle,
+    sw_r:player.sw_r,
+    sw_w:player.sw_w,
+    sw_h:player.sw_h,
+    sw_speed:player.sw_speed,
+    hp:player.hp,
+    hpmax:player.hpmax,
+    xp:player.xp,
+    lv:player.lv,
+    color:player.color,
+    spells:player.spells,
+    loadout:player.loadout,
+  };
+}
+
 // Shots fly straight at a constant speed, so the client moves them itself.
 // The server only says when one appears, turns (a parry) or disappears; a
 // known shot keeps its own smooth path unless it drifted far from the server.
@@ -27,16 +68,104 @@ export function mergeShots(previous,rows,at){
 }
 // Where a shot is at a given performance.now() time.
 export function shotAt(shot,time){if(shot.frozen)return {x:shot.x,y:shot.y};const t=Math.max(0,(time-shot.t)/1000);return {x:shot.x+shot.vx*t,y:shot.y+shot.vy*t};}
+
 class MapState {
   constructor(){
-    this.itemList=[];this.playerList=[];this.enemyList=[];this.pendingItems=new Set();
+    this.itemList=[];this.itemById=new Map();this.playerList=[];this.enemyList=[];this.pendingItems=new Set();
     this.syncPending=false;this.attackPending=false;this.nextSync=0;this.nextAttack=0;
     this.enemyMotion=new MotionBuffer(60);this.playerMotion=new MotionBuffer();
     this.enemyPending=false;this.nextEnemy=0;this.nextItems=0;
     this.projectiles={list:[],at:0};this.threat={level:1,elapsed:0};this.seenBlasts=new Set();this.hazards={list:[],at:0};this.skillZones={list:[],walls:[],decoys:[],at:0};
+    this.socket=null;this.activePlayer=null;
   }
-  reset(){this.nextSync=0;this.nextAttack=0;this.enemyList=[];this.enemyMotion.clear();this.playerMotion.clear();this.nextEnemy=0;this.nextItems=0;
-    this.projectiles={list:[],at:0};this.threat={level:1,elapsed:0};this.seenBlasts.clear();this.hazards={list:[],at:0};this.skillZones={list:[],walls:[],decoys:[],at:0};}
+  reset(){
+    this.nextSync=0;this.nextAttack=0;this.enemyList=[];this.enemyMotion.clear();this.playerMotion.clear();this.nextEnemy=0;this.nextItems=0;
+    this.projectiles={list:[],at:0};this.threat={level:1,elapsed:0};this.seenBlasts.clear();this.hazards={list:[],at:0};this.skillZones={list:[],walls:[],decoys:[],at:0};
+    this.attackPending=false;this.syncPending=false;this.enemyPending=false;
+  }
+  setActivePlayer(player){
+    this.activePlayer=player||null;
+  }
+  applyItemList(rows){
+    this.itemList=Array.isArray(rows)?rows:[];
+    this.itemById=new Map();
+    for(const row of this.itemList)this.itemById.set(row._id,row);
+  }
+  applyItemPatch(rows){
+    if(!Array.isArray(rows))return;
+    for(const row of rows){
+      if(!row||!row._id)continue;
+      const existing=this.itemById.get(row._id);
+      if(existing){
+        Object.assign(existing,row);
+      }else{
+        this.itemList.push(row);
+        this.itemById.set(row._id,row);
+      }
+    }
+  }
+  applyArenaState(data,at=performance.now()){
+    if(!data)return;
+    const payload=Array.isArray(data)?{enemies:data}:data;
+    this.enemyList=payload.enemies||[];
+    this.enemyMotion.push(this.enemyList,at);
+    if(Array.isArray(payload.players)){
+      this.playerList=payload.players;
+      this.playerMotion.push(payload.players.map(p=>({...p,vx:p.vx*30,vy:p.vy*30})),at);
+    }
+    const player=this.activePlayer;
+    if(player){
+      if(payload.me&&payload.me._id===player.id){
+        this.applyRecord(player,payload.me);
+      }else if(player.hp>0){
+        this.applyPhysics(player,payload.physics?.[player.id]);
+      }
+    }
+    this.projectiles=mergeShots(this.projectiles,payload.projectiles||[],at);
+    if(payload.threat)this.threat={...payload.threat,at};
+    this.hazards={list:payload.hazards||[],at};
+    this.skillZones={list:payload.skillZones||[],walls:payload.walls||[],decoys:payload.decoys||[],at};
+    for(const blast of payload.blasts||[]){
+      if(this.seenBlasts.has(blast.id))continue;
+      this.seenBlasts.add(blast.id);this.onBlast?.(blast);
+    }
+    if(this.seenBlasts.size>200)this.seenBlasts=new Set([...this.seenBlasts].slice(-50));
+  }
+  attachSocket(socket){
+    if(this.socket===socket)return;
+    this.socket=socket;
+    if(!socket)return;
+    socket.on('items:init',rows=>this.applyItemList(rows));
+    socket.on('items:patch',rows=>this.applyItemPatch(rows));
+    socket.on('arena:state',data=>this.applyArenaState(data,performance.now()));
+    socket.on('player:record',row=>{
+      if(this.activePlayer&&row&&row._id===this.activePlayer.id)this.applyRecord(this.activePlayer,row);
+    });
+    socket.on('connect',()=>{
+      if(this.activePlayer)socket.emit('newplayer',this.activePlayer.id);
+      if(!this.itemList.length)socket.emit('items:sync',rows=>this.applyItemList(rows));
+    });
+  }
+  hasLiveSocket(){
+    return !!(this.socket&&this.socket.connected);
+  }
+  emitWithAck(event,payload,timeoutMs=3000){
+    return new Promise((resolve,reject)=>{
+      if(!this.hasLiveSocket())return reject(new Error('Socket disconnected'));
+      let settled=false;
+      const timer=setTimeout(()=>{
+        if(settled)return;
+        settled=true;
+        reject(new Error(`${event} timeout`));
+      },timeoutMs);
+      this.socket.emit(event,payload,response=>{
+        if(settled)return;
+        settled=true;
+        clearTimeout(timer);
+        resolve(response);
+      });
+    });
+  }
   // Server knockback is a cumulative ledger; apply only what is not acked yet.
   applyPhysics(player,ledger){
     const ack=player.physicsAck||{seq:0,x:0,y:0,vx:0,vy:0};
@@ -48,71 +177,140 @@ class MapState {
   }
   applyRecord(player,row){
     this.applyPhysics(player,{seq:row.physicsSeq,x:row.physicsX,y:row.physicsY,vx:row.physicsVx,vy:row.physicsVy});
-    player.hp=row.hp;player.shield=row.shieldUntil>Date.now()?row.shield:0;player.reviveUsed=row.reviveUsed;player.invulnerableUntil=row.invulnerableUntil;
     if((row.augments||[]).length>=(player.augments||[]).length){
       const twinBefore=modifiers(player.augments).twin;
       player.augments=row.augments||[];
       if(!twinBefore&&modifiers(player.augments).twin)player.skills.charges+=modifiers(player.augments).thrustCharges-1;
     }
-    player.hpmax=stats(player.lv,player.augments).hpmax;
+    const nextHpmax=stats(player.lv,player.augments).hpmax;
+    // If an in-flight server snapshot predates a local level-up, preserve the
+    // level-up HP gain so the UI does not flash a phantom hurt effect.
+    const pendingLevelGain=row.hp>0&&row.lv&&row.lv<player.lv?Math.max(0,nextHpmax-(row.hpmax||nextHpmax)):0;
+    player.hp=row.hp>0?Math.min(nextHpmax,row.hp+pendingLevelGain):row.hp;
+    player.shield=row.shieldUntil>Date.now()?row.shield:0;player.reviveUsed=row.reviveUsed;player.invulnerableUntil=row.invulnerableUntil;
+    player.hpmax=nextHpmax;
     player.augmentOffer=row.augmentOffer||null;
   }
-  async addPlayer(player){await api.post('/player/add',player);this.playerList=(await api.get('/player')).data;}
+  async addPlayer(player){
+    this.activePlayer=player;
+    if(this.hasLiveSocket()){
+      const res=await this.emitWithAck('player:join',compactPlayerJoin(player));
+      if(!res||!res.ok)throw new Error((res&&res.error)||'Failed to join arena');
+      this.playerList=res.players||[];
+      if(Array.isArray(res.items))this.applyItemList(res.items);
+      if(res.player)this.applyRecord(player,res.player);
+      return;
+    }
+    await api.post('/player/add',compactPlayerJoin(player));
+    this.playerList=(await api.get('/player')).data;
+    if(!this.itemList.length)this.applyItemList((await api.get('/item')).data);
+  }
   async chooseAugment(player,augment){
-    await api.post('/player/update',player);
+    if(this.hasLiveSocket()){
+      const res=await this.emitWithAck('augment:choose',{id:player.id,augment,player:compactPlayerSync(player)});
+      if(!res||!res.ok)throw new Error((res&&res.error)||'Augment failed');
+      if(res.row)this.applyRecord(player,res.row);
+      return res.row;
+    }
+    await api.post('/player/update',compactPlayerSync(player));
     const row=(await api.post('/augment',{id:player.id,augment})).data;
     this.applyRecord(player,row);return row;
   }
   async castSpell(player,spell){
+    if(this.hasLiveSocket()){
+      const res=await this.emitWithAck('player:spell',{id:player.id,spell});
+      if(!res||!res.ok)throw new Error((res&&res.error)||'Spell failed');
+      if(res.row)this.applyRecord(player,res.row);
+      return res.row;
+    }
     const row=(await api.post(`/player/${player.id}/spell`,{spell})).data;
     if(row)this.applyRecord(player,row);return row;
   }
   async rerollAugment(player,index){
+    if(this.hasLiveSocket()){
+      const res=await this.emitWithAck('augment:reroll',{id:player.id,index});
+      if(!res||!res.ok)throw new Error((res&&res.error)||'Reroll failed');
+      if(res.row)this.applyRecord(player,res.row);
+      return res.row;
+    }
     const row=(await api.post('/augment/reroll',{id:player.id,index})).data;
     this.applyRecord(player,row);return row;
   }
   sync(player,now){
+    this.activePlayer=player;
+    // Fast path: stream player state over WebSocket; arena/player/item updates
+    // are pushed directly by the server with zero HTTP polling.
+    if(this.hasLiveSocket()){
+      if(now>=this.nextSync){
+        this.nextSync=now+50;
+        this.socket.emit('player:sync',compactPlayerSync(player));
+      }
+      return;
+    }
+    // Fallback HTTP polling if WebSocket is unavailable.
     if(!this.enemyPending&&now>=this.nextEnemy){
       this.nextEnemy=now+50;this.enemyPending=true;
-      api.get('/enemy').then(r=>{
-        const data=Array.isArray(r.data)?{enemies:r.data}:r.data,at=performance.now();
-        this.enemyList=data.enemies||[];this.enemyMotion.push(this.enemyList,at);
-        // Knockback rides the fast in-memory poll instead of the DB-backed sync.
-        if(player.hp>0)this.applyPhysics(player,data.physics?.[player.id]);
-        this.projectiles=mergeShots(this.projectiles,data.projectiles||[],at);
-        if(data.threat)this.threat={...data.threat,at};
-        this.hazards={list:data.hazards||[],at};
-        this.skillZones={list:data.skillZones||[],walls:data.walls||[],decoys:data.decoys||[],at};
-        for(const blast of data.blasts||[]){
-          if(this.seenBlasts.has(blast.id))continue;
-          this.seenBlasts.add(blast.id);this.onBlast?.(blast);
-        }
-        if(this.seenBlasts.size>200)this.seenBlasts=new Set([...this.seenBlasts].slice(-50));
-      }).catch(err=>console.warn('Enemy sync:',err.message)).finally(()=>{this.enemyPending=false;});
+      api.get('/enemy').then(r=>this.applyArenaState(r.data,performance.now())).catch(err=>console.warn('Enemy sync:',err.message)).finally(()=>{this.enemyPending=false;});
     }
     if(this.syncPending||now<this.nextSync)return;
     this.nextSync=now+100;this.syncPending=true;
     Promise.all([
-      // An older backend answers with an empty body; fall back to reading the row
-      // so the augment offer (and HP/shield) still reach the client.
-      api.post('/player/update',player).then(r=>r.data||api.get(`/player/${player.id}`).then(g=>g.data)).then(row=>{if(row)this.applyRecord(player,row);}),
+      api.post('/player/update',compactPlayerSync(player)).then(r=>r.data||api.get(`/player/${player.id}`).then(g=>g.data)).then(row=>{if(row)this.applyRecord(player,row);}),
       api.get('/player').then(r=>{this.playerList=r.data;this.playerMotion.push(r.data.map(p=>({...p,vx:p.vx*30,vy:p.vy*30})),performance.now());}),
-      now>=this.nextItems?(this.nextItems=now+500,api.get('/item').then(r=>{this.itemList=r.data;})):Promise.resolve(),
+      now>=this.nextItems?(this.nextItems=now+500,api.get('/item').then(r=>{this.applyItemList(r.data);})):Promise.resolve(),
     ]).catch(err=>console.warn('Arena sync:',err.message)).finally(()=>{this.syncPending=false;});
   }
   attackEnemies(player,onResult,now){
     if(this.attackPending||now<this.nextAttack)return;
-    this.nextAttack=now+180;this.attackPending=true;
     const poses=(player.swordPoses||[]).splice(0),bursts=(player.skills?.bursts||[]).splice(0);
-    api.post('/enemy/attack',{id:player.id,pos:{x:player.pos.x,y:player.pos.y},poses,bursts}).then(r=>{if(player.hp>0)onResult(r.data);}).catch(err=>console.warn('Attack sync:',err.message)).finally(()=>{this.attackPending=false;});
+    const payload={id:player.id,pos:{x:player.pos.x,y:player.pos.y},poses,bursts};
+    this.attackPending=true;
+    if(this.hasLiveSocket()){
+      this.nextAttack=now+100;
+      this.emitWithAck('enemy:attack',payload,2500).then(result=>{
+        if(player.hp>0&&result){
+          if(result.record)this.applyRecord(player,result.record);
+          onResult(result);
+        }
+      }).catch(err=>console.warn('Attack sync:',err.message)).finally(()=>{this.attackPending=false;});
+      return;
+    }
+    this.nextAttack=now+180;
+    api.post('/enemy/attack',payload).then(r=>{
+      if(player.hp>0&&r.data){
+        if(r.data.record)this.applyRecord(player,r.data.record);
+        onResult(r.data);
+      }
+    }).catch(err=>console.warn('Attack sync:',err.message)).finally(()=>{this.attackPending=false;});
   }
-  damage(player,dmg){api.put(`/player/${player.id}/damage`,{dmg}).catch(err=>console.warn(err.message));}
-  kill(player){this.playerList=this.playerList.filter(p=>p._id!==player.id);return api.delete(`/player/${player.id}/kill`).catch(err=>console.warn(err.message));}
+  damage(player,dmg){
+    if(this.hasLiveSocket()){
+      this.socket.emit('player:damage',{id:player.id,dmg});
+      return;
+    }
+    api.put(`/player/${player.id}/damage`,{dmg}).catch(err=>console.warn(err.message));
+  }
+  kill(player){
+    this.activePlayer=null;
+    this.playerList=this.playerList.filter(p=>p._id!==player.id);
+    if(this.hasLiveSocket()){
+      this.socket.emit('player:kill',{id:player.id});
+      return Promise.resolve();
+    }
+    return api.delete(`/player/${player.id}/kill`).catch(err=>console.warn(err.message));
+  }
   ate(item,player){
     this.pendingItems.add(item.id);
-    const row=this.itemList.find(row=>row._id===item.id);
-    if(row)Object.assign(row,{x:item.pos.x,y:item.pos.y,xp:item.xp,r:item.r});
-    api.post('/item/ate',{...item,playerId:player.id}).catch(err=>console.warn(err.message)).finally(()=>this.pendingItems.delete(item.id));
+    const row=this.itemById.get(item.id);
+    if(row)Object.assign(row,{x:item.pos.x,y:item.pos.y,color:item.color,xp:item.xp,r:item.r});
+    const payload={id:item.id,pos:item.pos,color:item.color,xp:item.xp,r:item.r,playerId:player.id};
+    if(this.hasLiveSocket()){
+      this.socket.emit('item:ate',payload);
+      this.pendingItems.delete(item.id);
+      return;
+    }
+    api.post('/item/ate',payload).catch(err=>console.warn(err.message)).finally(()=>this.pendingItems.delete(item.id));
   }
 }
 export const map=new MapState();
+export {MapState};

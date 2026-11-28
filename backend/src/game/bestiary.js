@@ -12,7 +12,7 @@ const angleDiff=(a,b)=>Math.atan2(Math.sin(a-b),Math.cos(a-b));
 // (pieces and summons that belong to another enemy: no XP, no kill effects).
 // unlock: first threat level at which a normal type joins the spawn pool.
 const SPECS={
-  shellback: {r:26,hp:40,speed:45,xp:70,contact:12,unlock:2,mass:1.6},
+  shellback: {r:26,hp:40,speed:85,xp:70,contact:12,unlock:2,mass:1.6},
   lancer:    {r:20,hp:28,speed:55,xp:60,contact:9, unlock:1},
   sickler:   {r:19,hp:24,speed:70,xp:55,contact:8, unlock:2},
   flea:      {r:16,hp:20,speed:80,xp:45,contact:8, unlock:1,mass:.7},
@@ -105,16 +105,19 @@ const AI={
   // 01 Shellback: a front shield that turns slowly; flank it or bait the bash.
   shellback(A,e,c){
     if (e.phase==='hunt') turnToward(e,c,1.1);
-    cycle(A,e,c,{windup:700,recover:1000,cooldown:900,ready:()=>c.dist<130,
-      start:()=>A.addHazard(e,{kind:'line',x:e.x,y:e.y,angle:e.facing,length:120,width:56,armAt:c.now+700,until:c.now+850,damage:dmg(A,e,16,c.now)})});
+    cycle(A,e,c,{windup:700,active:420,recover:1000,cooldown:900,ready:()=>c.dist<300,
+      start:()=>A.addHazard(e,{kind:'line',x:e.x,y:e.y,angle:e.facing,length:185,width:56,armAt:c.now+700,until:c.now+700,damage:0,telegraph:true,arrow:true})});
     e.guarding=e.phase!=='recover';
-    if (e.phase==='hunt') chase(e,c);else stop(e);
+    if (e.phase==='hunt') chase(e,c);
+    else if(e.phase==='active'){e.vx=e.aimX*440*c.slow;e.vy=e.aimY*440*c.slow;}
+    else stop(e);
   },
   // 02 Lancer: stops at mid range, thrusts in a locked line, long recovery.
   lancer(A,e,c){
-    cycle(A,e,c,{windup:450,active:360,recover:850,cooldown:600,ready:()=>c.dist<280,
-      start:()=>{aimAt(e,c);A.addHazard(e,{kind:'line',x:e.x,y:e.y,angle:e.facing,length:270,width:26,armAt:c.now+450,until:c.now+810,damage:dmg(A,e,18,c.now),bar:true});},
-      strike:()=>{e.thrustStart=c.now;}});
+    cycle(A,e,c,{windup:450,active:450,recover:850,cooldown:600,ready:()=>c.dist<280,
+      start:()=>{aimAt(e,c);A.addHazard(e,{kind:'line',x:e.x,y:e.y,angle:e.facing,length:340,width:26,armAt:c.now+450,until:c.now+450,damage:0,telegraph:true,bar:true});},
+      strike:()=>A.addShot(e,{kind:'spear',x:e.x+e.aimX*(e.r+10),y:e.y+e.aimY*(e.r+10),vx:e.aimX*720,vy:e.aimY*720,r:13,damage:dmg(A,e,18,c.now),until:c.now+450,pierce:true})});
+    e.unarmed=e.phase==='active'||e.phase==='recover';
     if (e.phase==='hunt') {keepRange(e,c,220,70,.4);aimAt(e,c);} else stop(e);
   },
   // 03 Sickler: the sickle flies out, pierces, and zips back along the same line.

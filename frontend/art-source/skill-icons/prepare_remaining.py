@@ -50,6 +50,17 @@ def cleanup(image):
                 changed.append([x, y, list(old), list(new)])
     return changed
 
+def sharpen_sword_wall(image, edits):
+    # One visible terminal pixel on the middle blade, matching its neighbors.
+    if image.size != (39, 39):
+        return
+    x, y = 18, 36
+    before = image.getpixel((x, y))
+    color = image.getpixel((18, 35))
+    if before == INK and color == (233, 215, 157, 255):
+        image.putpixel((x, y), color)
+        edits.append([x, y, list(before), list(color)])
+
 def make_icon(name, process):
     source_path = HERE / 'sources' / f'{name}.png'
     source = Image.open(source_path).convert('RGBA')
@@ -75,6 +86,8 @@ def make_icon(name, process):
     frame.paste(reduced, ((side-reduced.width)//2, (side-reduced.height)//2))
     frame.save(HERE / 'quantized' / f'{name}.png')
     edits = cleanup(frame)
+    if name == 'swordWall':
+        sharpen_sword_wall(frame, edits)
     output = filename(name)
     colors = len({p[:3] for p in frame.getdata() if p[3]})
     box = frame.getbbox()

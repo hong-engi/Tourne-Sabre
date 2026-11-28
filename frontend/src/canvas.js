@@ -10,6 +10,7 @@ import {API_ORIGIN} from './apiConfig';
 const {offerCount,DEFAULT_SPELLS,DEFAULT_SKILLS}=require('./gameRules');
 
 const socket = socketIOClient(API_ORIGIN, {transports: ['websocket']});
+map.attachSocket(socket);
 let player = null;
 const makePlayer = async (name, loadout={skills:DEFAULT_SKILLS,spells:DEFAULT_SPELLS}) => {
   const next = new Player(name);
@@ -21,12 +22,13 @@ const makePlayer = async (name, loadout={skills:DEFAULT_SKILLS,spells:DEFAULT_SP
   map.onBlast=blast=>addEffect('bomb',blast,'');
   await map.addPlayer(next);
   player = next;
+  map.setActivePlayer(player);
   resetEffects();
-  socket.emit('newplayer', player.id);
 };
 function death(myref) {
   const result = player && {lv: player.lv, xp: player.xp};
   player = null;
+  map.setActivePlayer(null);
   resetEffects();
   myref.current.appearThis(result);
 }

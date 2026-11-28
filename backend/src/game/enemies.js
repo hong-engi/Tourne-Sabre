@@ -1,4 +1,4 @@
-const {modifiers,stats,CHARGE,chargeDestination,SPELLS,SKILLS,kitOf}=require('../../../frontend/src/gameRules');
+const {modifiers,stats,chargeDestination,SPELLS,SKILLS,kitOf}=require('../../../frontend/src/gameRules');
 const {CollisionWorld}=require('./collisions');
 const bestiary=require('./bestiary');
 const geometry=require('../../../frontend/src/hazardGeometry');
@@ -16,13 +16,14 @@ const PUSH_DRAG=5,MOVE_RECOVERY=4;
 const THREAT_STEP_MS=40000;
 const BOMB_RADIUS=115,BOMB_TRIGGER=40,BOMB_FUSE_MS=900,SPIT_AIM_MS=550,SPIT_EVERY_MS=2300,SPIT_SPEED=260,SPIT_FAST_SPEED=460;
 const STALKER_RANGE=520,STALKER_RAMP_RATE=38,STALKER_MAX_EXTRA=400,STALKER_MAX_SPEED=520;
-const SPLITTER_HOP_MS=650,SPLITTER_DRAG=3.2,SPLITTER_BURST=3.1;
+const SPLITTER_HOP_MS=950,SPLITTER_DRAG=1.9,SPLITTER_BURST=3.6;
 const MITE_HOP_MS=380,MITE_DRAG=4.2,MITE_BURST=2.2;
+const CHARGER_RUN_SECONDS=.9;
 const TYPES = {
   spinner:  {r:24,hp:30,speed:62, xp:55,contact:13,unlock:1,mass:1.0},
   charger:  {r:29,hp:45,speed:38, xp:80,contact:13,unlock:1,mass:1.8},
   stalker:  {r:17,hp:20,speed:120,xp:35,contact:9, unlock:1,mass:.65},
-  bomber:   {r:20,hp:24,speed:150,xp:45,contact:8, unlock:1,mass:.8},
+  bomber:   {r:20,hp:24,speed:210,xp:45,contact:8, unlock:1,mass:.8},
   spitter:  {r:21,hp:30,speed:72, xp:50,contact:8, unlock:1,mass:.9},
   splitter: {r:30,hp:55,speed:48, xp:40,contact:12,unlock:1,mass:1.8},
   mite:     {r:13,hp:12,speed:185,xp:12,contact:6, unlock:Infinity,mass:.5},
@@ -500,8 +501,10 @@ class EnemyArena {
       } else if (e.parentId&&!TYPES[e.type].unlock) {
         e.vx=0;e.vy=0;
       } else if (e.type === 'charger') {
-        if (e.phase === 'windup' && now >= e.phaseUntil) {e.phase = 'charge'; e.phaseUntil = now + CHARGE.duration;}
-        else if (e.phase === 'charge' && now >= e.phaseUntil) {e.phase = 'recover'; e.phaseUntil = now + 1100;}
+        if (e.phase === 'windup' && now >= e.phaseUntil) {
+          e.phase = 'charge'; e.phaseUntil = now + CHARGER_RUN_SECONDS*1000;
+          e.chargeElapsed=0;e.chargeFromX=e.x;e.chargeFromY=e.y;
+        }
         else if (e.phase === 'recover' && now >= e.phaseUntil) e.phase = 'hunt';
         if (e.phase === 'hunt' && dist < 430) {
           e.phase = 'windup'; e.phaseUntil = now + 850; e.aimX = nx; e.aimY = ny;
@@ -513,7 +516,7 @@ class EnemyArena {
           const distance=Math.hypot(e.chargeEndX-e.x,e.chargeEndY-e.y);
           if(distance>0){e.aimX=(e.chargeEndX-e.x)/distance;e.aimY=(e.chargeEndY-e.y)/distance;}
         }
-        const speed = e.phase === 'charge' ? CHARGE.speed : e.phase === 'hunt' ? base : 0;
+        const speed = e.phase === 'charge' ? Math.hypot(e.vx,e.vy) : e.phase === 'hunt' ? base : 0;
         e.vx = (e.phase === 'charge' ? e.aimX : nx) * speed;
         e.vy = (e.phase === 'charge' ? e.aimY : ny) * speed;
       } else if (e.type === 'stalker') {
@@ -537,7 +540,7 @@ class EnemyArena {
         if (e.phase === 'aim' && now >= e.phaseUntil) {
           const speed=charged?SPIT_FAST_SPEED:SPIT_SPEED;
           this.projectiles.push({id:`s-${++this.sequence}`,owner:'enemy',sourceId:e.id,x:e.x+e.aimX*(e.r+6),y:e.y+e.aimY*(e.r+6),
-            vx:e.aimX*speed,vy:e.aimY*speed,r:9,kind:charged?'spitRed':undefined,sourceType:'spitter:shot',damage:this.outgoing(e,14*e.power,now),until:now+2600});
+            vx:e.aimX*speed,vy:e.aimY*speed,r:9,kind:charged?'spitRed':undefined,sourceType:'spitter:shot',damage:this.outgoing(e,(charged?24:14)*e.power,now),until:now+2600});
           e.shotCount=(e.shotCount||0)+1;
           e.charged=e.shotCount%3===2;
           e.phase='hunt';e.nextShot=now+SPIT_EVERY_MS;
@@ -587,6 +590,16 @@ class EnemyArena {
             e.vx = e.hopVx; e.vy = e.hopVy;
           }
         }
+      } else if (e.type === 'spinner') {
+        // Aim the blade's next sweep at the player, rather than retreating
+        // before the shorter sword can reach. Match its world-space geometry.
+        const ahead=e.angle+.25*e.angularVelocity;
+        const reach=e.r+42,tx=p.x+Math.sin(ahead)*reach,ty=p.y+Math.cos(ahead)*reach;
+        const ex=tx-e.x,ey=ty-e.y,d=Math.hypot(ex,ey)||1;
+        const speed=base*Math.min(1,d/30),ease=1-Math.exp(-5*dt);
+        e.moveVx=(e.moveVx||0)+(ex/d*speed-(e.moveVx||0))*ease;
+        e.moveVy=(e.moveVy||0)+(ey/d*speed-(e.moveVy||0))*ease;
+        e.vx=e.moveVx;e.vy=e.moveVy;
       } else {
         const radial = dist < 150 ? -.4 : 1;
         e.vx = (nx * radial - ny * .55) * base;
@@ -615,10 +628,15 @@ class EnemyArena {
       // at the tick's end in snapshots for client interpolation/extrapolation.
       const pushStep=(1-decay)/PUSH_DRAG;
       if(e.type==='charger'&&e.phase==='charge'){
-        const remaining=Math.hypot(e.chargeEndX-e.x,e.chargeEndY-e.y);
-        const travel=Math.min(remaining,CHARGE.speed*slow*dt);
-        e.x+=e.aimX*travel;e.y+=e.aimY*travel;
-        if(travel>=remaining){e.x=e.chargeEndX;e.y=e.chargeEndY;e.phase='recover';e.phaseUntil=now+1100;e.vx=0;e.vy=0;}
+        if(e.chargeElapsed==null){e.chargeElapsed=0;e.chargeFromX=e.x;e.chargeFromY=e.y;}
+        e.chargeElapsed+=dt*slow;
+        const u=Math.min(1,e.chargeElapsed/CHARGER_RUN_SECONDS),progress=u*u*(3-2*u);
+        const dx=e.chargeEndX-e.chargeFromX,dy=e.chargeEndY-e.chargeFromY;
+        // Smooth acceleration and braking preserve the advertised endpoint.
+        e.x=e.chargeFromX+dx*progress;e.y=e.chargeFromY+dy*progress;
+        const rate=6*u*(1-u)/CHARGER_RUN_SECONDS*slow;
+        e.vx=dx*rate;e.vy=dy*rate;
+        if(u>=1){e.x=e.chargeEndX;e.y=e.chargeEndY;e.phase='recover';e.phaseUntil=now+1100;e.vx=0;e.vy=0;}
       }else{
         e.x = Math.max(-2950, Math.min(2950, e.x + e.vx * dt + pushX*pushStep));
         e.y = Math.max(-2950, Math.min(2950, e.y + e.vy * dt + pushY*pushStep));
@@ -843,7 +861,7 @@ class EnemyArena {
       }
       // Blades swat enemy shots out of the air; with parry they fly back.
       for (const s of this.projectiles) {
-        if (s.owner!=='enemy' || s.until<=now) continue;
+        if (s.owner!=='enemy' || s.until<=now || s.kind==='spitRed') continue;
         if (!poses.some(q=>swordHits({...player,...q,x:q.x??player.x,y:q.y??player.y},s))) continue;
         this.reward(id).hits.push({id:s.id,x:s.x,y:s.y,damage:0,deflect:true});
         if (s.batted) {
@@ -931,6 +949,10 @@ class EnemyArena {
   }
   snapshot(now=this.lastTime??0) {return this.enemies.map(e => {
     const row={...e};delete row.name;delete row.path;delete row.leapFromX;delete row.leapFromY;
+    if ((e.type==='splitter'||e.type==='mite')&&e.nextHop) {
+      const interval=e.type==='splitter'?SPLITTER_HOP_MS:MITE_HOP_MS;
+      row.hopProgress=Math.max(0,Math.min(1,(now-e.nextHop+interval)/Math.min(420,interval)));
+    }
     if (e.type==='bomber'&&e.phase==='fuse') {row.fuseLeft=Math.max(0,e.phaseUntil-now);row.fuseTotal=BOMB_FUSE_MS;}
     if (e.type==='shellback') row.blockFlash=now<(e.blockFlashUntil||0);
     if (e.type==='flea'&&e.phase==='leap'&&e.phaseUntil>e.leapStart) {

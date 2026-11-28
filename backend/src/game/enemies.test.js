@@ -14,7 +14,7 @@ test('charger telegraphs, locks its aim, charges, then recovers',()=>{
   arena.step([p],1000); assert.equal(e.phase,'windup'); assert.equal(Math.abs(e.vx),0);
   p.y=200; arena.step([p],1900);
   assert.equal(e.phase,'charge'); assert.equal(e.aimY,0); assert.ok(e.vx<0);
-  arena.step([p],2500); assert.equal(e.phase,'recover'); assert.equal(Math.abs(e.vx),0);
+  for(let now=1950;now<=2850;now+=50)arena.step([p],now); assert.equal(e.phase,'recover'); assert.equal(Math.abs(e.vx),0);
 });
 test('weapon attacks apply cooldown, award XP once, and remove dead enemies',()=>{
   const arena=new EnemyArena(()=>0); const p=player(); const e=arena.spawn(p,'stalker');
@@ -43,7 +43,7 @@ test('charge destination stays fixed, remaining distance shrinks, and movement c
   const end={x:e.chargeEndX,y:e.chargeEndY};
   assert.equal(Math.round(Math.hypot(end.x-e.x,end.y-e.y)),286);
   let previous=286;
-  for(const now of [1900,2000,2100,2200,2300,2400]){
+  for(const now of [1900,2000,2100,2200,2300,2400,2500,2600,2700,2800]){
     arena.step([p],now);
     assert.equal(e.chargeEndX,end.x);assert.equal(e.chargeEndY,end.y);
     const distance=Math.hypot(end.x-e.x,end.y-e.y);
@@ -287,4 +287,29 @@ test('charging charger knocks the player back strongly without being pushed itse
   const corr=arena.playerCorrections.find(x=>x.id===String(p._id));
   assert.ok(corr&&corr.dvx>600,'player is knocked back strongly along charge');
   assert.equal(c.pushVx||0,0,'charger is not pushed back');
+});
+
+test('charger gains speed then brakes smoothly into the marked endpoint',()=>{
+  const a=new EnemyArena(()=>0),p=player();a.nextSpawn=Infinity;a.startedAt=1000;a.lastTime=1000;
+  const e=a.spawn(p,'charger',1000,{x:300,y:0});
+  a.step([p],1050);
+  p.y=500; // Keep collision response out of the motion profile.
+  const speeds=[];
+  for(let t=1900;t<=2800;t+=50){a.step([p],t);speeds.push(Math.hypot(e.vx,e.vy));}
+  assert.ok(speeds[0]>0&&speeds[0]<speeds[5],'accelerates after windup');
+  assert.ok(speeds[12]>0&&speeds[12]<speeds[8],'brakes before recovery');
+  assert.equal(e.phase,'recover');
+  assert.equal(e.x,e.chargeEndX);assert.equal(e.y,e.chargeEndY);
+});
+
+test('spinner closes the old dead zone and brings its short blade into range',()=>{
+  const a=new EnemyArena(()=>0),p=player();a.nextSpawn=Infinity;a.startedAt=1000;a.lastTime=1000;
+  const e=a.spawn(p,'spinner',1000,{x:145,y:0});
+  let bladeHit=false;
+  for(let t=1050;t<=11000;t+=50){
+    const events=a.step([p],t);
+    if(t===1050)assert.ok(e.vx<0,'approaches instead of backing away at distance 145');
+    if(events.some(d=>d.source==='spinner:blade'))bladeHit=true;
+  }
+  assert.ok(bladeHit,'its own blade can reach a stationary player');
 });

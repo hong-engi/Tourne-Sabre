@@ -1,86 +1,200 @@
-const express = require("express");
-const cors = require("cors");
-const mongoose = require('mongoose');
+const express = require('express');
+const cors = require('cors');
 const http = require('http');
 const fs = require('fs');
-const path = require("path");
-const bodyParser = require("body-parser");
-const socketIo = require("socket.io");
-const mapRouter = require("./routes/map");
-const Object = require("./object.js");
-const itemdb = require("./db/itemdb");
-const playerdb = require("./db/playerdb");
-const {playLog} = require('./game/playLog');
+const path = require('path');
+const bodyParser = require('body-parser');
+const socketIo = require('socket.io');
+const mapRouter = require('./routes/map');
+const GameObject = require('./object.js');
+const itemdb = require('./db/itemdb');
+const playerdb = require('./db/playerdb');
+const progression = require('./game/progression');
+const runtime = require('./game/runtime');
+const { playLog } = require('./game/playLog');
 
-// Flush unfinished runs to disk when the server is stopped.
-for (const signal of ['SIGINT','SIGTERM']) process.once(signal, () => {playLog.endAll('shutdown'); process.exit(0);});
+function createServer() {
+  const app = express();
 
-const app = express();
-const port = Number(process.env.PORT) || 8080;
-const mongoUri = process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/tourne_sabre_local';
+  app.use(cors());
+  app.use(bodyParser.json());
+  app.use(bodyParser.urlencoded({ extended: true }));
 
-app.use(cors());
-app.use(bodyParser.json());
-app.use(bodyParser.urlencoded({
-  extended: true,
-}));
+  app.use('/map', mapRouter);
+  app.use('/lab', require('./routes/lab'));
+  app.get('/healthz', (req, res) => {
+    res.json({ ok: true, dbReady: true, storage: 'memory' });
+  });
 
-mongoose.connect(mongoUri, {
-  useNewUrlParser: true,
-  useUnifiedTopology: true,
-});
-
-const db = mongoose.connection;
-
-db.once('open', function() {
-  playerdb.removeAll(() => {});
-  itemdb.removeAll(() => {});
-  for (let i = 0; i < 1000; i++) {
-    itemdb.add(Object.Item.randomItem(), () => {});
+  // Serve the production React build from the same port when available.
+  const buildDir = path.join(__dirname, '../../frontend/build');
+  if (fs.existsSync(path.join(buildDir, 'index.html'))) {
+    app.use(express.static(buildDir));
+    app.get('/', (req, res) => {
+      res.sendFile(path.join(buildDir, 'index.html'));
+    });
+  } else {
+    app.get('/', (req, res) => {
+      res.status(418).send('Hi');
+    });
   }
-  require("./game/runtime").start();
-  console.log("DB ready!");
-});
 
-app.use("/map", mapRouter);
-app.use("/lab", require("./routes/lab"));
-app.get("/healthz", (req, res) => {
-  res.json({ ok: true, dbReady: mongoose.connection.readyState === 1 });
-});
+  const server = http.createServer(app);
+  const io = socketIo(server, {
+    cors: { origin: '*' },
+    perMessageDeflate: false,
+    pingInterval: 25000,
+    pingTimeout: 20000,
+  });
 
-// Serve the production React build from the same port when available.
-const buildDir = path.join(__dirname, "../../frontend/build");
-if (fs.existsSync(path.join(buildDir, "index.html"))) {
-  app.use(express.static(buildDir));
-  app.get("/", (req, res) => {
-    res.sendFile(path.join(buildDir, "index.html"));
+  // Broadcast incremental item respawns to all connected clients instead of
+  // polling 1,000 items over HTTP every 500ms.
+  itemdb.setOnChange(row => {
+    if (io.engine.clientsCount > 0) io.emit('items:patch', [row]);
   });
-} else {
-  app.get("/", (req, res) => {
-    res.status(418).send("Hi");
+
+  io.on('connection', socket => {
+    socket.data = { pid: null };
+
+    // Send the full item list once on connection; updates arrive via items:patch.
+    socket.emit('items:init', itemdb.list());
+
+    socket.on('items:sync', ack => {
+      const list = itemdb.list();
+      if (typeof ack === 'function') ack(list);
+      else socket.emit('items:init', list);
+    });
+
+    socket.on('newplayer', playerid => {
+      socket.data.pid = playerid ? String(playerid) : null;
+    });
+
+    socket.on('player:join', (payload, ack) => {
+      try {
+        const record = playerdb.addSync(payload);
+        socket.data.pid = record._id;
+        playLog.start(record);
+        const players = playerdb.list().map(progression.playerPublic);
+        const items = itemdb.list();
+        if (typeof ack === 'function') {
+          ack({ ok: true, player: progression.playerRecord(record), players, items });
+        }
+      } catch (err) {
+        if (typeof ack === 'function') ack({ ok: false, error: err.message });
+      }
+    });
+
+    socket.on('player:sync', payload => {
+      if (!payload) return;
+      const beforeOffer = playerdb.get(payload.id ?? payload._id)?.augmentOffer;
+      const row = progression.syncSync(payload);
+      // Push immediately when a new augment offer opens so the picker appears without delay.
+      if (row && !beforeOffer && row.augmentOffer) {
+        socket.emit('player:record', progression.playerRecord(row));
+      }
+    });
+
+    socket.on('enemy:attack', (payload, ack) => {
+      try {
+        const result = runtime.handleAttack(payload, Date.now());
+        if (typeof ack === 'function') ack(result);
+      } catch (err) {
+        if (typeof ack === 'function') ack({ hits: [], xp: 0, error: 'Invalid attack' });
+      }
+    });
+
+    socket.on('item:ate', payload => {
+      if (!payload) return;
+      // Broadcast to other clients; the picker already applied it optimistically.
+      const row = itemdb.updateSync(payload, { notify: false });
+      socket.broadcast.emit('items:patch', [row]);
+      try {
+        progression.pickupHealSync(payload.playerId);
+      } catch (err) {
+        console.error(err.message);
+      }
+    });
+
+    socket.on('player:damage', payload => {
+      if (!payload || !payload.id) return;
+      const change = progression.damageSync(payload.id, payload.dmg);
+      if (change) playLog.damage(payload.id, { source: 'pvp', raw: Number(payload.dmg) || 0, ...change });
+    });
+
+    socket.on('player:kill', payload => {
+      const id = payload && (payload.id || payload);
+      if (!id) return;
+      playLog.end(id, 'kill');
+      playerdb.removeSync(id);
+      if (socket.data.pid === String(id)) socket.data.pid = null;
+    });
+
+    socket.on('player:spell', (payload, ack) => {
+      try {
+        const id = payload && payload.id;
+        const spell = payload && payload.spell;
+        const row = progression.castSpellSync(id, spell, runtime.arena);
+        playLog.spell(id, spell);
+        if (typeof ack === 'function') ack({ ok: true, row: progression.playerRecord(row) });
+      } catch (err) {
+        if (typeof ack === 'function') ack({ ok: false, error: err.message });
+      }
+    });
+
+    socket.on('augment:choose', (payload, ack) => {
+      try {
+        if (payload && payload.player) progression.syncSync(payload.player);
+        const row = progression.chooseSync(payload.id, payload.augment);
+        if (typeof ack === 'function') ack({ ok: true, row: progression.playerRecord(row) });
+      } catch (err) {
+        if (typeof ack === 'function') ack({ ok: false, error: err.message });
+      }
+    });
+
+    socket.on('augment:reroll', (payload, ack) => {
+      try {
+        const row = progression.rerollSync(payload.id, payload.index);
+        if (typeof ack === 'function') ack({ ok: true, row: progression.playerRecord(row) });
+      } catch (err) {
+        if (typeof ack === 'function') ack({ ok: false, error: err.message });
+      }
+    });
+
+    socket.on('disconnect', () => {
+      const pid = socket.data && socket.data.pid;
+      if (pid) {
+        playLog.end(pid, 'disconnect');
+        playerdb.removeSync(pid);
+      }
+    });
   });
+
+  return { app, server, io };
 }
 
-const server = http.createServer(app);
-const io = socketIo(server, {
-  cors: { origin: '*' },
-});
+function boot() {
+  // Flush unfinished runs to disk when the server is stopped.
+  for (const signal of ['SIGINT', 'SIGTERM']) {
+    process.once(signal, () => {
+      playLog.endAll('shutdown');
+      runtime.stop();
+      process.exit(0);
+    });
+  }
 
-io.on("connection", (socket) => {
-  console.log('socket connected!');
-  var pid;
+  playerdb.clear();
+  itemdb.seed(1000, () => GameObject.Item.randomItem());
 
-  socket.on("newplayer", (playerid) => {
-    pid = playerid;
+  const { server, io } = createServer();
+  runtime.start(io);
+
+  const port = Number(process.env.PORT) || 8080;
+  server.listen(port, () => {
+    console.log(`Listening on port ${port} (in-memory store ready, 1000 items seeded)`);
   });
+  return { server, io };
+}
 
-  socket.on("disconnect", () => {
-    console.log("Client disconnected");
-    if (pid) playLog.end(pid, 'disconnect');
-    playerdb.remove(pid, () => {});
-  });
-});
+if (require.main === module) boot();
 
-server.listen(port, () => {
-  console.log(`Listening on port ${port}`);
-});
+module.exports = { createServer, boot };

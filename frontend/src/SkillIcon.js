@@ -29,13 +29,20 @@ import bladeVeil from './assets/pixel/skills/blade-veil.png';
 import ironStance from './assets/pixel/skills/iron-stance.png';
 import frostMail from './assets/pixel/skills/frost-mail.png';
 import bloodPact from './assets/pixel/skills/blood-pact.png';
+import mirrorShield from './assets/pixel/skills/mirror-shield.png';
+import swordWall from './assets/pixel/skills/sword-wall.png';
+import thornCloak from './assets/pixel/skills/thorn-cloak.png';
+import sanctuary from './assets/pixel/skills/sanctuary.png';
+import timeShell from './assets/pixel/skills/time-shell.png';
+import fortress from './assets/pixel/skills/fortress.png';
 const {SKILLS:SKILL_DEFS,SPELLS:SPELL_DEFS}=require('./gameRules');
 const ALL_DEFS=SKILL_DEFS.concat(SPELL_DEFS);
 
 // Bind artwork to ability identity, so changing QWER / DF loadouts follows it.
 const ICONS = {reverse,giant,accel,thrust,dash,twinBlade,turret,boomerang,slam,
   blink,ghost,heal,ignite,barrier,exhaust,smite,crescent,decoy,
-  crossScar,needleRain,iaido,sawThrow,bloodSeal,horizon,parryStance,bladeVeil,ironStance,frostMail,bloodPact};
+  crossScar,needleRain,iaido,sawThrow,bloodSeal,horizon,parryStance,bladeVeil,ironStance,frostMail,bloodPact,
+  mirrorShield,swordWall,thornCloak,sanctuary,timeShell,fortress};
 const DEFAULT_KEYS = {KeyQ:'reverse',KeyW:'giant',KeyE:'accel',KeyR:'thrust'};
 export default function SkillIcon({id,code}) {
   const image=useRef(null);
@@ -57,7 +64,7 @@ export default function SkillIcon({id,code}) {
     observer?.observe(image.current);
     return ()=>{disposed=true;observer?.disconnect();};
   },[src]);
-  // Expansion skills have no pixel art yet: show a lettered placeholder.
+  // Use a lettered fallback for abilities without artwork.
   if (!src) {
     const def=ALL_DEFS.find(d=>d.id===iconId);
     if (!def) return null;

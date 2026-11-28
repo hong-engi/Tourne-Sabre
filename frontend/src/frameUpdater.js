@@ -82,19 +82,30 @@ export default function frameUpdate(me,keys,myref,now=performance.now(),dt=1/30)
     if(result.heal)addEffect('heal',me.pos,`+${result.heal}`);
     if(result.shieldGained)addEffect('shield',me.pos,'보호막');
   },now);
+  const pickupScale=mod.pickupRange,harvest=!!mod.harvest;
+  let bladeReach=0;
+  if(harvest){
+    for(const b of me.blades){
+      const reach=me.r+(b.sw_r||0)+(b.sw_h||0)/2+(b.x!=null?Math.hypot(b.x-me.pos.x,b.y-me.pos.y):0);
+      if(reach>bladeReach)bladeReach=reach;
+    }
+  }
+  const maxItemCheck=Math.max((me.r+14)*pickupScale,bladeReach+14);
   for(const row of map.itemList){
-    const item=Item.schemaItem(row);
-    const touching=Math.hypot(item.pos.x-me.pos.x,item.pos.y-me.pos.y)<=(me.r+item.r)*mod.pickupRange||
-      (mod.harvest&&me.blades.some(b=>bladeTouches(b,me.pos,me.r,{x:item.pos.x,y:item.pos.y,r:item.r})));
-    if(touching&&!map.pendingItems.has(item.id)){
+    if(Math.abs(row.x-me.pos.x)>maxItemCheck||Math.abs(row.y-me.pos.y)>maxItemCheck)continue;
+    const touching=Math.hypot(row.x-me.pos.x,row.y-me.pos.y)<=(me.r+row.r)*pickupScale||
+      (harvest&&me.blades.some(b=>bladeTouches(b,me.pos,me.r,{x:row.x,y:row.y,r:row.r})));
+    if(touching&&!map.pendingItems.has(row._id)){
+      const item=Item.schemaItem(row);
       const xp=item.xp;addEffect('pickup',item.pos,`+${xp} XP`);
       item.init(Item.randomItem().pos);gainXp(me,xp);map.ate(item,me);
     }
   }
   me.lastPvpHit=me.lastPvpHit||{};
   for(const row of map.playerList){
+    if(row._id===me.id||!(row.hp>0))continue;
     const other=Player.schemaPlayer(row);
-    if(other.hp>0&&me.trytohit(other)&&now-(me.lastPvpHit[other.id]||-Infinity)>=250){
+    if(me.trytohit(other)&&now-(me.lastPvpHit[other.id]||-Infinity)>=250){
       me.lastPvpHit[other.id]=now;map.damage(other,Math.round((me.lv+9)*me.attackMultiplier));
     }
   }

@@ -1,36 +1,98 @@
-const {EnemyArena} = require('./enemies');
-const playerModel = require('../models/player');
-const {playLog} = require('./playLog');
+const { EnemyArena } = require('./enemies');
+const playerdb = require('../db/playerdb');
+const progression = require('./progression');
+const { playLog } = require('./playLog');
+
 const arena = new EnemyArena();
-let ticking = false;
-let timer;
-function start() {
+let timer = null;
+let ioRef = null;
+
+function setIo(io) {
+  ioRef = io;
+}
+
+function handleAttack(body, now = Date.now()) {
+  const stored = body && playerdb.get(body.id);
+  const attacker = stored ? { ...stored } : null;
+  const pos = (body && body.pos) || {};
+  if (attacker && Number.isFinite(pos.x) && Number.isFinite(pos.y)) {
+    attacker.x = pos.x;
+    attacker.y = pos.y;
+  }
+  if (attacker) {
+    attacker.poses = body.poses;
+    attacker.bursts = body.bursts;
+  }
+  const result = arena.attack(attacker, now);
+  if (attacker) {
+    playLog.attack(attacker._id, result, now, arena.threat(now).level);
+    const updated = progression.applyAttackOutcome(attacker._id, result, now);
+    if (updated && (result.heal || result.hpCost || result.shield || result.shieldAdd || result.shieldGained)) {
+      result.record = progression.playerRecord(updated);
+    }
+  }
+  return result;
+}
+
+function tick(now = Date.now()) {
+  const players = playerdb.listLiving();
+  const connected = ioRef ? ioRef.engine.clientsCount : 0;
+  // Save idle CPU when the arena is completely empty and nobody is connected.
+  if (!players.length && !arena.enemies.length && !connected) return;
+
+  const events = arena.step(players, now);
+  playLog.tick(players, arena, now);
+
+  for (const c of arena.playerCorrections) {
+    playerdb.applyPhysicsCorrection(c);
+  }
+  const ledger = new Map(
+    players.map(p => [
+      String(p._id),
+      {
+        seq: p.physicsSeq || 0,
+        x: p.physicsX || 0,
+        y: p.physicsY || 0,
+        vx: p.physicsVx || 0,
+        vy: p.physicsVy || 0,
+      },
+    ])
+  );
+  arena.physicsLedger = ledger;
+
+  for (const event of events) {
+    const change = progression.damageSync(event.id, event.amount, now);
+    if (change) playLog.damage(event.id, { source: event.source, raw: event.amount, ...change });
+  }
+
+  if (ioRef && connected > 0) {
+    const shared = arena.state(now);
+    const publicPlayers = playerdb.list().map(progression.playerPublic);
+    for (const socket of ioRef.sockets.sockets.values()) {
+      const pid = socket.data && socket.data.pid;
+      const me = pid ? progression.playerRecord(playerdb.get(pid)) : null;
+      // Volatile prevents stale snapshots from piling up on slow connections.
+      socket.volatile.emit('arena:state', { ...shared, players: publicPlayers, me });
+    }
+  }
+}
+
+function start(io) {
+  if (io) ioRef = io;
   if (timer) return;
-  timer = setInterval(async () => {
-    if (ticking) return;
-    ticking = true;
+  timer = setInterval(() => {
     try {
-      const players = await playerModel.find({hp: {$gt: 0}}).lean();
-      const now = Date.now();
-      const events = arena.step(players, now);
-      playLog.tick(players, arena, now);
-      // Mirror each player's knockback ledger (DB value + this tick) in memory
-      // so clients get it on the 50ms /enemy poll instead of waiting for the
-      // DB write and the slower player sync. Both fields move together, so a
-      // client acking a value before the DB write lands stays consistent.
-      const ledger=new Map(players.map(p=>[String(p._id),{seq:p.physicsSeq||0,x:p.physicsX||0,y:p.physicsY||0,vx:p.physicsVx||0,vy:p.physicsVy||0}]));
-      for(const c of arena.playerCorrections){
-        const l=ledger.get(String(c.id));if(!l)continue;
-        l.seq+=1;l.x+=c.dx;l.y+=c.dy;l.vx+=c.dvx;l.vy+=c.dvy;
-      }
-      arena.physicsLedger=ledger;
-      await Promise.all(arena.playerCorrections.map(c=>playerModel.updateOne({_id:c.id,hp:{$gt:0}},{$inc:{x:c.dx,y:c.dy,vx:c.dvx/30,vy:c.dvy/30,physicsX:c.dx,physicsY:c.dy,physicsVx:c.dvx,physicsVy:c.dvy,physicsSeq:1}})));
-      await Promise.all(events.map(async event => {
-        const change=await require('./progression').damage(event.id,event.amount);
-        if (change) playLog.damage(event.id,{source:event.source,raw:event.amount,...change});
-      }));
-    } catch (err) { console.error('AI update failed:', err.message); }
-    finally {ticking = false;}
+      tick(Date.now());
+    } catch (err) {
+      console.error('AI update failed:', err.message);
+    }
   }, 50);
 }
-module.exports = {arena, start};
+
+function stop() {
+  if (!timer) return;
+  clearInterval(timer);
+  timer = null;
+}
+
+module.exports = { arena, start, stop, tick, setIo, handleAttack };
