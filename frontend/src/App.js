@@ -43,7 +43,7 @@ export default function App() {
       <div className="lobby-rules"><span><b>01</b> Move with ↑ ← ↓ →</span><span><b>02</b> QWER · DF 스킬</span></div>
     </section></div>}
 
-    {active && <SkillBar skills={hud && hud.skills} paused={hud && hud.augmentMenuOpen} onActivate={activateSkill}/>}
+    {active && <SkillBar skills={hud && hud.skills} paused={hud && hud.augmentMenuOpen && !hud.augmentLive} onActivate={activateSkill}/>}
     {active && hud && <section className="experience-dock" aria-label="경험치 상태">
       {hud.threat&&<div className="threat-hud" title="40초마다 적이 강해집니다"><span>위협 {hud.threat.level}</span><span>{clock(hud.threat.elapsed)}</span></div>}
       <div className="experience-label"><span>Lv. {level} <button className={`augment-open ${pending?"augment-pending":""}`} onClick={()=>setAugmentMenu(true)}>증강 {pending?`+${pending}`:(hud.augments||[]).length}</button></span><span>{hud.xp} / {xpNext} XP</span></div>

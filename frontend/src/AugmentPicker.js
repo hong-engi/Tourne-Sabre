@@ -62,7 +62,8 @@ export default function AugmentPicker({hud,onChoose,onReroll,onClose}){
     if(busy)return;setBusy(true);setError('');
     try{await action();}catch(err){setError(err.response?.data?.error||'저장하지 못했습니다. 다시 시도해 주세요.');}finally{setBusy(false);}
   }
-  return <div className="augment-overlay"><section ref={panel} className="augment-panel" style={tier?{'--tier-color':tier.color}:undefined} onKeyDown={event=>{
+  const live=!!hud.augmentLive;
+  return <div className={`augment-overlay${live?' augment-overlay-live':''}`}><section ref={panel} className="augment-panel" style={tier?{'--tier-color':tier.color}:undefined} onKeyDown={event=>{
     if(event.key==='Escape'){event.stopPropagation();onClose();}
     // Held movement keys must not scroll the panel.
     if(ARROWS.has(event.key))event.preventDefault();
@@ -71,7 +72,7 @@ export default function AugmentPicker({hud,onChoose,onReroll,onClose}){
       if(event.shiftKey && document.activeElement===buttons[0]){event.preventDefault();buttons[buttons.length-1]?.focus();}
       else if(!event.shiftKey && document.activeElement===buttons[buttons.length-1]){event.preventDefault();buttons[0]?.focus();}
     }
-  }} role="dialog" aria-modal="true" aria-labelledby="augment-title">
+  }} role="dialog" aria-modal={!live} aria-labelledby="augment-title">
     <header className="augment-header">
       <div>
         <h2 id="augment-title">{pending?<>증강 선택 {tier&&<span className="augment-tier-badge">{tier.name}</span>}</>:'획득한 증강'}</h2>
@@ -79,6 +80,7 @@ export default function AugmentPicker({hud,onChoose,onReroll,onClose}){
       </div>
       <button className="augment-close" onClick={onClose}>{pending?'나중에 선택':'닫기'}</button>
     </header>
+    {live&&<p className="augment-live-note" role="status">다른 플레이어가 있어 게임이 멈추지 않아요. 고르는 동안에도 움직이고 싸울 수 있어요.</p>}
     {error&&<p role="alert" className="join-error">{error}</p>}
     {pending>0&&!offer&&<p className="augment-waiting" role="status">증강을 준비하는 중…</p>}
     {offer&&<>

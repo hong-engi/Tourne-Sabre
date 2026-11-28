@@ -45,18 +45,21 @@ test('a boss spawns once at threat 5 and regular spawns thin out around it',()=>
   a.step([p],200);
   assert.equal(a.enemies.filter(e=>e.type==='swordsaint').length,1);
 });
-test('lancer telegraphs a locked line, and only the armed hazard deals damage',()=>{
+test('lancer fires a separate spear, hides its held weapon, and hits along the flight path',()=>{
   const a=quiet(),p=player();
   const e=a.spawn(p,'lancer',1000,{x:200,y:0});e.nextAttack=0;
   a.step([p],1050);
-  assert.equal(e.phase,'windup');
+  assert.equal(e.phase,'windup');assert.equal(e.unarmed,false);
   const h=a.hazards.find(h=>h.sourceId===e.id);
-  assert.equal(h.kind,'line');assert.equal(h.bar,true);
-  assert.equal(a.step([p],1300).length,0,'no damage during the warning');
-  const hits=a.step([p],1050+470);
-  assert.ok(hits.some(d=>d.source==='lancer:hazard'));
-  assert.equal(e.phase,'active');
-  assert.ok(a.snapshot(1050+520).find(o=>o.id===e.id).spearExt>0,'spear extends during thrust');
+  assert.equal(h.kind,'line');assert.equal(h.bar,true);assert.equal(h.damage,0);
+  assert.equal(a.step([p],1300).length,0,'warning deals no early damage');
+  a.step([p],1500);
+  assert.equal(e.phase,'active');assert.equal(a.snapshot(1500)[0].unarmed,true);
+  const spear=a.projectiles.find(s=>s.kind==='spear');
+  assert.ok(spear&&spear.pierce);assert.equal(Math.hypot(spear.vx,spear.vy),720);
+  p.x=40; // Walk toward the already flying spear.
+  const hits=a.step([p],1550);
+  assert.ok(hits.some(d=>d.source==='lancer'&&d.amount===18));
 });
 test('sickler telegraphs with a bar, pierces players, and returns faster',()=>{
   const a=quiet(),p=player();
@@ -73,6 +76,8 @@ test('sickler telegraphs with a bar, pierces players, and returns faster',()=>{
   assert.ok(hit.some(d=>d.source==='sickler'));
   assert.ok(a.projectiles.includes(s),'pierces without disappearing');
   a.step([p],2650);
+  assert.ok(Math.hypot(s.vx,s.vy)<outSpeed,'decelerates before turning');
+  a.step([p],3000);
   assert.ok(Math.hypot(s.vx,s.vy)>outSpeed*1.8,'returns much faster');
 });
 test('shellback blocks frontal sword hits completely but not hits from behind',()=>{
@@ -153,4 +158,18 @@ test('all types are known to the spawner and have sane stats',()=>{
     if (!spec.tier&&type!=='mite'&&type!=='leech') assert.ok(Number.isFinite(spec.unlock),type);
     if (spec.tier&&spec.tier!=='part') assert.ok(AI[type],type);
   }
+});
+
+test('shellback moves faster and bashes with its body only after the warning',()=>{
+  const a=quiet(),p=player(),e=a.spawn(p,'shellback',1000,{x:220,y:0});
+  e.facing=Math.PI;e.nextAttack=0;
+  assert.ok(TYPES.shellback.speed>=80);
+  assert.equal(a.step([p],1050).length,0);assert.equal(e.phase,'windup');
+  assert.equal(a.hazards[0].damage,0);
+  assert.equal(a.step([p],1700).length,0);
+  const start=e.x;
+  a.step([p],1750);assert.equal(e.phase,'active');assert.ok(e.x<start);
+  const events=[];
+  for(let t=1800;t<=2150;t+=50)events.push(...a.step([p],t));
+  assert.ok(events.some(d=>d.amount===16),'actual body impact deals bash damage');
 });

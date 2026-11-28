@@ -264,7 +264,7 @@ test('spitter tracks player while aiming and fires a faster red shot every 3rd a
     const proj=arena.projectiles.at(-1);
     const spd=Math.hypot(proj.vx,proj.vy);
     if(shot<3){assert.ok(spd<300);assert.equal(proj.kind,undefined);}
-    else{assert.ok(spd>400,'3rd shot is faster');assert.equal(proj.kind,'spitRed');}
+    else{assert.ok(spd>400,'3rd shot is faster');assert.equal(proj.kind,'spitRed');assert.equal(proj.damage,24);}
     arena.projectiles=[];t+=3000;
   }
 });
@@ -312,4 +312,27 @@ test('spinner closes the old dead zone and brings its short blade into range',()
     if(events.some(d=>d.source==='spinner:blade'))bladeHit=true;
   }
   assert.ok(bladeHit,'its own blade can reach a stationary player');
+});
+
+test('red spit and boomerangs survive a blade with or without reflection',()=>{
+  for(const kind of ['spitRed','sickle'])for(const augments of [[],['parry']]){
+    const a=new EnemyArena(()=>0),p={...player(),augments};
+    const shot={id:'test-shot',kind,owner:'enemy',sourceId:'test-enemy',x:0,y:-110,vx:10,vy:0,r:10,damage:24,until:5000};
+    a.projectiles.push(shot);
+    const result=a.attack(p,1000);
+    assert.equal(a.projectiles[0],shot);assert.equal(shot.owner,'enemy');
+    assert.ok(!result.hits.some(h=>h.deflect));
+  }
+});
+
+test('splitters coast farther between longer hops and expose synchronized bounce timing',()=>{
+  const a=new EnemyArena(()=>0),p=player();a.nextSpawn=Infinity;a.startedAt=1000;a.lastTime=1000;
+  const e=a.spawn(p,'splitter',1000,{x:500,y:0});
+  a.step([p],1050);const first=e.nextHop,from=e.x;
+  a.step([p],1200);
+  assert.ok(a.snapshot(1200)[0].hopProgress>0&&a.snapshot(1200)[0].hopProgress<1);
+  for(let t=1250;t<=1900;t+=50)a.step([p],t);
+  assert.equal(e.nextHop,first,'one long coast rather than another early hop');
+  assert.ok(from-e.x>55,'coasts farther than the previous short hop');
+  assert.ok(Math.hypot(e.vx,e.vy)>20,'retains momentum between hops');
 });

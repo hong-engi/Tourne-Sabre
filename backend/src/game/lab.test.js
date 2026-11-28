@@ -3,7 +3,7 @@ const assert=require('node:assert');
 const fs=require('fs');
 const os=require('os');
 const path=require('path');
-const {EnemyLab,readNotes,writeNote}=require('./lab');
+const {EnemyLab,readNotes,writeNote,readFeedback,writeFeedback}=require('./lab');
 
 function seeded(seed=7) {
   return ()=>{seed=(seed*16807)%2147483647;return (seed-1)/2147483646;};
@@ -71,4 +71,52 @@ test('notes save, update status and delete on empty text', ()=>{
   writeNote('lancer',{text:'  '},file);
   assert.ok(!readNotes(file).lancer);
   assert.throws(()=>writeNote('nope',{text:'x'},file));
+});
+
+test('codex training ground carries the kit and respawns its pack', ()=>{
+  const lab=new EnemyLab({random:seeded(11)});
+  const setup={loadout:['thrust','reverse','giant','accel'],spells:['blink','heal'],augments:['vampire'],pack:3,enemyHp:.5};
+  const state=lab.codexStep('vampire',1000,{x:0,y:0,hp:150,setup});
+  assert.strictEqual(state.type,'codex:vampire');
+  const sim=lab.sims.get('codex:vampire');
+  assert.deepStrictEqual(sim.dummy.augments,['vampire']);
+  assert.strictEqual(sim.dummy.loadout[0],'thrust');
+  assert.strictEqual(sim.arena.enemies.filter(e=>e.labSlot!=null).length,3);
+  assert.ok(sim.arena.enemies.every(e=>e.hp<=Math.ceil(e.hpmax*.5)),'enemies start at the requested health');
+  for (const e of sim.arena.enemies) e.hp=0;
+  for (let k=1;k<=15;k++) lab.codexStep('vampire',1000+k*100,{x:0,y:0,hp:150,setup});
+  assert.strictEqual(sim.arena.enemies.filter(e=>e.hp>0&&e.labSlot!=null).length,3,'killed pack comes back');
+  // A changed setup rebuilds the sim; low health reaches the server dummy.
+  lab.codexStep('vampire',3000,{x:0,y:0,hp:30,setup:{...setup,boss:true}});
+  const next=lab.sims.get('codex:vampire');
+  assert.notStrictEqual(next,sim);
+  assert.strictEqual(next.dummy.hp,30);
+  assert.ok(next.arena.enemies.some(e=>e.type==='swordsaint'));
+  assert.throws(()=>lab.codexStep('nope',4000,{}));
+});
+
+test('codex step casts expansion skills through the real skill engine', ()=>{
+  const lab=new EnemyLab({random:seeded(13)});
+  const setup={loadout:['crescent','reverse','giant','accel'],spells:['blink','heal'],augments:[],pack:2,frozen:true};
+  lab.codexStep('crescent',1000,{x:0,y:0,hp:150,setup});
+  const res=lab.codexStep('crescent',1100,{x:0,y:0,hp:150,setup,bursts:[{kind:'cast',id:'crescent',x:0,y:0,ox:0,oy:0,dx:0,dy:-1}]});
+  assert.ok(res.skillZones.length>0,'crescent leaves a skill zone to draw');
+  const sim=lab.sims.get('codex:crescent');
+  const home=sim.arena.enemies.map(e=>[e.x,e.y]);
+  lab.codexStep('crescent',1600,{x:0,y:0,hp:150,setup});
+  assert.deepStrictEqual(sim.arena.enemies.map(e=>[e.x,e.y]),home,'frozen targets stay put');
+});
+
+test('skill feedback writes keep the shared file shape and older verdicts', ()=>{
+  const file=path.join(fs.mkdtempSync(path.join(os.tmpdir(),'fb-')),'feedback.json');
+  fs.writeFileSync(file,JSON.stringify({thrust:{text:'old',verdict:'keep',at:'x'}}));
+  writeFeedback('thrust',{text:' 더 길게 '},file,new Date(0));
+  writeFeedback('vampire',{text:'좋음'},file,new Date(0));
+  let all=readFeedback(file);
+  assert.deepStrictEqual(all.thrust,{text:'더 길게',verdict:'keep',at:new Date(0).toISOString()});
+  assert.strictEqual(all.vampire.text,'좋음');
+  writeFeedback('vampire',{text:''},file);
+  all=readFeedback(file);
+  assert.ok(!all.vampire);
+  assert.throws(()=>writeFeedback('nope',{text:'x'},file));
 });

@@ -134,6 +134,17 @@ function bladePoses(player,arena) {
 function healFactor(player,mod) {
   return mod.healScale*(mod.brink && player.hp<=(player.hpmax||100)*.3?1.25:1);
 }
+// AI bookkeeping the client never reads (timers, internal targets, movement
+// parts). It stays on the server so each 20Hz state stays small; telegraphs
+// and shot paths are drawn by the client from phase/aim and velocity.
+const SERVER_ONLY=new Set(['name','path','leapFromX','leapFromY','phaseUntil','nextAttack','speedScale','nextShot','moveVx','moveVy','pushVx','pushVy',
+  'staggerUntil','hopVx','hopVy','nextHop','recoveringMovement','chargeElapsed','chargeFromX','chargeFromY','ramp','shotCount','leapToX','leapToY',
+  'leapStart','tpAt','pulseAt','motherId','hatchAt','keepAfterParent','dashX','dashY','spiralR','fullHp','coreContact','trailAt','buildX','buildY',
+  'nextSpecial','expireAt','launchPillarId','launchAngle','arriveAt','arriveX','arriveY','callCount','offsetSide','baseSpeedScale','stakeSide',
+  'regrowAt','chainTurn','swapPending','orbTurn','brewing','brewDamage','planted','exposedUntil','summonerId','heat','sparkAt','featherAt',
+  'gliding','attach','clawing','runEndX','runEndY','running']);
+// Two decimals are plenty on screen and halve the size of every float.
+const wire=v=>typeof v==='number'&&!Number.isInteger(v)?Math.round(v*100)/100:v;
 class EnemyArena {
   constructor(random = Math.random) {
     this.random = random;
@@ -692,8 +703,17 @@ class EnemyArena {
     const damage=[];
     for (const s of this.projectiles) {
       const slow=s.owner==='enemy'?this.chronoSlow(s.x,s.y,players):1;
+      // Ease through zero velocity when the boomerang starts its return.
+      if(s.kind==='sickle'&&s.returnAt&&now>=s.returnAt){
+        s.returnStart=s.returnAt;s.returnAt=0;s.outVx=s.vx;s.outVy=s.vy;
+      }
+      if(s.returnStart!=null){
+        const t=Math.min(1,Math.max(0,(now-s.returnStart)/400)),k=t*t*(3-2*t);
+        const factor=1-(1+(s.returnSpeed||1))*k;
+        s.vx=s.outVx*factor;s.vy=s.outVy*factor;
+        if(factor<0&&!s.returning){s.returning=true;s.hitIds=[];}
+      }
       s.x+=s.vx*dt*slow;s.y+=s.vy*dt*slow;
-      // A sickle turns around once and flies back along its path (optionally faster).
       if (s.returnAt&&now>=s.returnAt) {const mult=s.returnSpeed||1;s.returnAt=0;s.vx=-s.vx*mult;s.vy=-s.vy*mult;s.hitIds=[];}
       // A roller wheel pauses, telegraphs a new arrow toward the nearest player, and rolls again.
       if (s.owner==='enemy'&&s.pauseAt&&now>=s.pauseAt) {
@@ -861,7 +881,7 @@ class EnemyArena {
       }
       // Blades swat enemy shots out of the air; with parry they fly back.
       for (const s of this.projectiles) {
-        if (s.owner!=='enemy' || s.until<=now || s.kind==='spitRed') continue;
+        if (s.owner!=='enemy' || s.until<=now || (s.kind==='spitRed'||s.kind==='sickle')) continue;
         if (!poses.some(q=>swordHits({...player,...q,x:q.x??player.x,y:q.y??player.y},s))) continue;
         this.reward(id).hits.push({id:s.id,x:s.x,y:s.y,damage:0,deflect:true});
         if (s.batted) {
@@ -948,7 +968,10 @@ class EnemyArena {
     }
   }
   snapshot(now=this.lastTime??0) {return this.enemies.map(e => {
-    const row={...e};delete row.name;delete row.path;delete row.leapFromX;delete row.leapFromY;
+    const row={};
+    // false/null read the same as missing on the client, so they are not sent.
+    for (const k in e) if (!SERVER_ONLY.has(k)&&e[k]!==false&&e[k]!=null) row[k]=wire(e[k]);
+    if (e.phase!=='charge') {delete row.chargeEndX;delete row.chargeEndY;}
     if ((e.type==='splitter'||e.type==='mite')&&e.nextHop) {
       const interval=e.type==='splitter'?SPLITTER_HOP_MS:MITE_HOP_MS;
       row.hopProgress=Math.max(0,Math.min(1,(now-e.nextHop+interval)/Math.min(420,interval)));
@@ -961,10 +984,6 @@ class EnemyArena {
       row.leapDir=e.vx<0?-1:1;
     }
     if (e.type==='egg'&&e.hatchAt) {row.hatchLeft=Math.max(0,e.hatchAt-now);row.hatchTotal=2200;}
-    if (e.type==='lancer'&&e.phase==='active'&&e.thrustStart&&e.phaseUntil>e.thrustStart) {
-      const t=Math.max(0,Math.min(1,(now-e.thrustStart)/(e.phaseUntil-e.thrustStart)));
-      row.spearExt=t<.22?t/.22:t<.65?1:Math.max(0,1-(t-.65)/.35);
-    }
     if (e.type==='shroom'&&e.tpAt&&now-e.tpAt<450) {
       row.tpFromX=e.tpFromX;row.tpFromY=e.tpFromY;row.tpProgress=(now-e.tpAt)/450;
     }
@@ -972,7 +991,7 @@ class EnemyArena {
   });}
   state(now) {
     return {enemies:this.snapshot(now),
-      projectiles:this.projectiles.map(({id,owner,x,y,vx,vy,r,kind})=>({id,owner,x,y,vx,vy,r,kind})),
+      projectiles:this.projectiles.map(({id,owner,x,y,vx,vy,r,kind})=>({id,owner,x:wire(x),y:wire(y),vx:wire(vx),vy:wire(vy),r,kind})),
       // Hazard timing is relative (ms from now) so clients need no clock sync.
       hazards:this.hazards.map(h=>({id:h.id,kind:h.kind,x:h.x,y:h.y,r:h.r,angle:h.angle,length:h.length,width:h.width,spread:h.spread,
         from:h.from,to:h.to,band:h.band,gapAngle:h.gapAngle,gapSize:h.gapSize,gapCount:h.gapCount||1,armIn:h.armAt-now,left:h.until-now,total:h.armAt-h.born,
@@ -987,4 +1006,4 @@ class EnemyArena {
   }
 }
 require('./skillEngine').install(EnemyArena);
-module.exports = {EnemyArena, swordHits, TYPES, THREAT_STEP_MS, threatScale, spawnPlan, BLADE_POWER};
+module.exports = {EnemyArena, SERVER_ONLY, swordHits, TYPES, THREAT_STEP_MS, threatScale, spawnPlan, BLADE_POWER};

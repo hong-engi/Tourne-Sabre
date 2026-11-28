@@ -6,17 +6,19 @@ const spellTimes = new Map();
 const kit = p => ({ skills: p.loadout, spells: p.spells });
 const clampCoord = v => Math.max(-2975, Math.min(2975, v));
 
+const wire = v => (typeof v === 'number' && !Number.isInteger(v) ? Math.round(v * 100) / 100 : v);
+
 function playerPublic(p) {
   if (!p) return null;
   return {
     _id: p._id,
     name: p.name,
-    x: p.x,
-    y: p.y,
-    vx: p.vx,
-    vy: p.vy,
+    x: wire(p.x),
+    y: wire(p.y),
+    vx: wire(p.vx),
+    vy: wire(p.vy),
     r: p.r,
-    sw_angle: p.sw_angle,
+    sw_angle: wire(p.sw_angle),
     sw_r: p.sw_r,
     sw_w: p.sw_w,
     sw_h: p.sw_h,
@@ -101,7 +103,9 @@ function syncSync(body) {
   p.sw_h = body.sw_h;
   p.sw_speed = body.sw_speed;
   p.skillState = body.combatState || {};
-  p.choosingAugment = !!body.augmentMenuOpen;
+  // The augment picker pauses only a solo run; with other players alive the
+  // room keeps going so nobody can hide in the menu during PvP.
+  p.choosingAugment = !!body.augmentMenuOpen && !playerdb.listLiving().some(o => o._id !== p._id);
   p.xp = xp;
   p.lv = lv;
   p.hp = Math.min(hpmax, p.hp + Math.max(0, hpmax - p.hpmax));

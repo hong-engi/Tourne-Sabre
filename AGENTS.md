@@ -43,6 +43,8 @@ The user reviews skills, spells, and augments in a local web UI. Start it with `
 
 ## Enemy Lab (bestiary and fix notes)
 
+- `/lab-check` (또는 `$lab-check`) 요청은 [.agents/skills/lab-check/SKILL.md](.agents/skills/lab-check/SKILL.md)를 실행한다. 모든 Lab 메모를 확인·반영하고, 이전에 완료되어 구현까지 확인한 항목은 삭제한다. 이번에 반영한 항목은 원문을 유지한 `done` 상태로 남긴다.
+
 The user reviews enemies in an in-game page that shows each enemy moving and attacking with the real server AI. Open `http://localhost:3000/?lab` (dev) or `http://localhost:3001/?lab` (play build); `&enemy=<type>` opens one enemy's detail. It needs the backend running.
 
 - Frontend: `frontend/src/EnemyLab.js`/`EnemyLab.css` (mounted from `index.js` when the URL has `?lab`), drawn with `drawLabScene` in `mapdraw.js`. Names and one-line roles come from `enemyNames.js`.
@@ -60,6 +62,8 @@ Use JavaScript, ES module imports in the frontend, and CommonJS in the backend. 
 Use Jest and React Testing Library, placing `*.test.js` files beside source files. No coverage threshold is configured. Input tests must cover physical `KeyboardEvent.code` values with Korean characters. Verify gameplay changes manually, including movement, combat, and disconnect cleanup, and record results.
 
 ## Commit & Pull Request Guidelines
+
+Work directly on `main` by default for almost all tasks. Create a new branch only after receiving the user's explicit permission; do not create branches automatically for task isolation or routine workflows. If working on `main` is impractical, explain why and ask for permission before creating a branch.
 
 History uses short, informal subjects such as `kill added`; no strict convention is established. Write descriptive subjects. PRs should explain behavior changes, link relevant issues, list validation performed, and include screenshots for UI changes.
 

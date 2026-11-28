@@ -67,12 +67,21 @@ function tick(now = Date.now()) {
 
   if (ioRef && connected > 0) {
     const shared = arena.state(now);
-    const publicPlayers = playerdb.list().map(progression.playerPublic);
+    shared.players = playerdb.list().map(progression.playerPublic);
+    // One broadcast is encoded once for every client. Volatile drops stale
+    // snapshots on slow links instead of letting them pile up.
+    ioRef.volatile.emit('arena:state', shared);
+    // The small private record goes out per socket, reliably (a volatile one
+    // would be dropped behind the broadcast) and only when it changed.
     for (const socket of ioRef.sockets.sockets.values()) {
       const pid = socket.data && socket.data.pid;
-      const me = pid ? progression.playerRecord(playerdb.get(pid)) : null;
-      // Volatile prevents stale snapshots from piling up on slow connections.
-      socket.volatile.emit('arena:state', { ...shared, players: publicPlayers, me });
+      const me = pid && playerdb.get(pid);
+      if (!me) continue;
+      const record = progression.playerRecord(me);
+      const key = JSON.stringify(record);
+      if (socket.data.lastMe === key) continue;
+      socket.data.lastMe = key;
+      socket.emit('arena:me', record);
     }
   }
 }

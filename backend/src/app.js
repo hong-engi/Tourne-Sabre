@@ -13,7 +13,11 @@ const progression = require('./game/progression');
 const runtime = require('./game/runtime');
 const { playLog } = require('./game/playLog');
 
-function createServer() {
+// A dropped socket (network blip, Render instance swap) keeps its player for a
+// short grace period so the reconnecting client can reclaim it.
+const RECONNECT_GRACE_MS = 8000;
+
+function createServer({ reconnectGraceMs = RECONNECT_GRACE_MS } = {}) {
   const app = express();
 
   app.use(cors());
@@ -53,8 +57,16 @@ function createServer() {
     if (io.engine.clientsCount > 0) io.emit('items:patch', [row]);
   });
 
+  const leaving = new Map();
+  const claimed = (pid, except) => [...io.sockets.sockets.values()].some(s => s !== except && s.data && s.data.pid === pid);
+  const keep = pid => {
+    const timer = pid && leaving.get(pid);
+    if (timer) clearTimeout(timer);
+    if (pid) leaving.delete(pid);
+  };
+
   io.on('connection', socket => {
-    socket.data = { pid: null };
+    socket.data = { pid: null, missingAt: 0 };
 
     // Send the full item list once on connection; updates arrive via items:patch.
     socket.emit('items:init', itemdb.list());
@@ -65,15 +77,21 @@ function createServer() {
       else socket.emit('items:init', list);
     });
 
-    socket.on('newplayer', playerid => {
+    // Reconnect: reclaim the player. known=false tells the client to rejoin.
+    socket.on('newplayer', (playerid, ack) => {
       socket.data.pid = playerid ? String(playerid) : null;
+      keep(socket.data.pid);
+      if (typeof ack === 'function') ack({ known: !!playerdb.get(socket.data.pid) });
     });
 
     socket.on('player:join', (payload, ack) => {
       try {
-        const record = playerdb.addSync(payload);
+        const id = payload && String(payload.id ?? payload._id);
+        keep(id);
+        const existing = payload && payload.rejoin ? playerdb.get(id) : null;
+        const record = existing || playerdb.addSync(payload);
         socket.data.pid = record._id;
-        playLog.start(record);
+        if (!existing) playLog.start(record);
         const players = playerdb.list().map(progression.playerPublic);
         const items = itemdb.list();
         if (typeof ack === 'function') {
@@ -86,7 +104,17 @@ function createServer() {
 
     socket.on('player:sync', payload => {
       if (!payload) return;
-      const beforeOffer = playerdb.get(payload.id ?? payload._id)?.augmentOffer;
+      const known = playerdb.get(payload.id ?? payload._id);
+      if (!known) {
+        // The server lost this player (restart or expired grace): ask for a rejoin.
+        const now = Date.now();
+        if (now - socket.data.missingAt > 1000) {
+          socket.data.missingAt = now;
+          socket.emit('player:missing');
+        }
+        return;
+      }
+      const beforeOffer = known.augmentOffer;
       const row = progression.syncSync(payload);
       // Push immediately when a new augment offer opens so the picker appears without delay.
       if (row && !beforeOffer && row.augmentOffer) {
@@ -162,10 +190,18 @@ function createServer() {
 
     socket.on('disconnect', () => {
       const pid = socket.data && socket.data.pid;
-      if (pid) {
+      if (!pid || claimed(pid, socket)) return;
+      keep(pid);
+      const remove = () => {
+        leaving.delete(pid);
+        if (claimed(pid, socket) || !playerdb.get(pid)) return;
         playLog.end(pid, 'disconnect');
         playerdb.removeSync(pid);
-      }
+      };
+      if (!(reconnectGraceMs > 0)) return remove();
+      const timer = setTimeout(remove, reconnectGraceMs);
+      if (timer.unref) timer.unref();
+      leaving.set(pid, timer);
     });
   });
 

@@ -13,7 +13,8 @@ Follow this procedure when applying enemy fix notes or adding/updating enemies i
 
 1. Read `ENEMY_NOTES.json` at the repository root (`{type: {text, status, updatedAt}}`, where `status` is `note`, `todo`, or `done`).
 2. Identify every `todo` entry and any `note` entry that clearly requests a change.
-3. **Never delete or rewrite the user's `text` without asking.**
+3. For `/lab-check` or an explicit completed-note cleanup request, follow `../lab-check/SKILL.md`: verify and remove previously completed entries, while keeping newly applied entries for review.
+4. **Never delete or rewrite the user's `text` without authorization. An explicit cleanup request authorizes removal of verified completed entries.**
 
 ## 2. Apply Changes
 

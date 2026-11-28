@@ -84,30 +84,52 @@ test('in-memory progression preserves physics ledger corrections, offers, choice
   assert.ok(healed.hp > dmg.after.hp);
 });
 
-test('runtime tick pushes arena:state with players and per-socket me record over Socket.IO', () => {
+test('runtime tick broadcasts one shared arena:state and a private arena:me per socket', () => {
   playerdb.addSync({ id: 'p1', name: 'One', pos: { x: 0, y: 0 }, speed: { x: 0, y: 0 }, hp: 100, hpmax: 100, xp: 0, lv: 1 });
+  const broadcast = [];
   const emitted = [];
   const fakeSocket = {
     data: { pid: 'p1' },
-    volatile: {
-      emit(event, payload) {
-        emitted.push({ event, payload });
-      },
+    emit(event, payload) {
+      emitted.push({ event, payload });
     },
   };
   const fakeIo = {
     engine: { clientsCount: 1 },
+    volatile: { emit: (event, payload) => broadcast.push({ event, payload }) },
     sockets: { sockets: new Map([['s1', fakeSocket]]) },
   };
   runtime.setIo(fakeIo);
   runtime.tick(1000);
 
+  assert.equal(broadcast.length, 1);
+  assert.equal(broadcast[0].event, 'arena:state');
+  assert.equal(broadcast[0].payload.players.length, 1);
+  assert.equal(broadcast[0].payload.players[0]._id, 'p1');
+  assert.equal(broadcast[0].payload.me, undefined, 'private record is not broadcast');
   assert.equal(emitted.length, 1);
-  assert.equal(emitted[0].event, 'arena:state');
-  assert.equal(emitted[0].payload.players.length, 1);
-  assert.equal(emitted[0].payload.players[0]._id, 'p1');
-  assert.equal(emitted[0].payload.me._id, 'p1');
-  assert.equal(emitted[0].payload.me.hp, 100);
+  assert.equal(emitted[0].event, 'arena:me');
+  assert.equal(emitted[0].payload._id, 'p1');
+  assert.equal(emitted[0].payload.hp, 100);
+  runtime.tick(1050);
+  assert.equal(emitted.length, 1, 'an unchanged record is not resent');
+  playerdb.get('p1').hp = 80;
+  runtime.tick(1100);
+  assert.equal(emitted.length, 2);
+  assert.equal(emitted[1].payload.hp, 80);
+});
+
+test('enemy snapshots leave server-only AI fields behind and round floats', () => {
+  const { EnemyArena, SERVER_ONLY } = require('./enemies');
+  const a = new EnemyArena(() => 0.37);
+  const p = { _id: 'p', x: 0, y: 0, hp: 100, hpmax: 100, lv: 5, augments: [], r: 25 };
+  for (let t = 1000; t < 6000; t += 50) a.step([p], t);
+  const rows = a.snapshot(6000);
+  assert.ok(rows.length > 0);
+  for (const row of rows) {
+    for (const k of Object.keys(row)) assert.ok(!SERVER_ONLY.has(k), `${k} leaked`);
+    for (const k of ['x', 'y', 'vx', 'vy']) assert.equal(row[k], Math.round(row[k] * 100) / 100);
+  }
 });
 
 test('runtime handleAttack applies heal/shield outcomes directly in memory and returns updated record', () => {

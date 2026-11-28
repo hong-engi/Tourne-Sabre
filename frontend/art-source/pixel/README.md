@@ -31,3 +31,5 @@ Verified: local entry, arrow-key movement, rotating sword, HUD icons, transparen
 Charger and stalker art extends the native canvas sprite masks in `frontend/src/enemyArt.js`; movement, rotation, text and effects still render at device resolution.
 
 Experience pickups now use four value-based variants. See [`../xp-pickups/README.md`](../xp-pickups/README.md) for their ImageGen → Fixer → 16-color pipeline and source prompt. The original `shard.png` remains available as an archival asset.
+
+Lancer body separation: `python3 frontend/art-source/pixel/separate_lancer.py` preserves the original `lancer.png` and removes rows 0–26 (the spear above the helmet) into `lancer-body.png`, keeping the native 15×66 canvas and palette. The existing `lancer-spear.png` is rendered separately while held and as a fixed-size projectile after firing.

@@ -1,4 +1,4 @@
-import frameUpdate,{gainXp,LEVEL_UP_MENU_DELAY,NOVA_MENU_DELAY} from './frameUpdater';
+import frameUpdate,{gainXp,updateAugmentMenu,LEVEL_UP_MENU_DELAY,NOVA_MENU_DELAY} from './frameUpdater';
 import {addEffect} from './mapdraw';
 jest.mock('./map',()=>({map:{sync:jest.fn(),kill:jest.fn()}}));
 jest.mock('./canvas',()=>({death:jest.fn()}));
@@ -50,4 +50,17 @@ test('further XP does not postpone an already scheduled picker',()=>{
   gainXp(me,300,1200);
   expect(me.augmentMenuAt).toBe(1000+LEVEL_UP_MENU_DELAY);
   expect(addEffect).toHaveBeenLastCalledWith('levelUp',{x:0,y:0,id:'hero'},'Lv. 6',1200);
+});
+
+test('in a shared arena the picker neither pops up nor pauses',()=>{
+  const me=hero([]);
+  gainXp(me,100,1000);
+  expect(updateAugmentMenu(me,1000+LEVEL_UP_MENU_DELAY,true)).toBe(false);
+  expect(me.augmentMenuOpen).toBe(false);
+  expect(me.augmentMenuAt).toBe(0);
+  expect(addEffect).toHaveBeenLastCalledWith('level',{x:0,y:0},'증강 선택 가능');
+  me.augmentMenuOpen=true;
+  expect(updateAugmentMenu(me,2000,true)).toBe(false);
+  expect(me.augmentPaused).toBe(false);
+  expect(updateAugmentMenu(me,2000,false)).toBe(true);
 });

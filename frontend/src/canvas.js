@@ -55,12 +55,14 @@ export function activateSkill(code) {
 export function setAugmentMenu(open) {
   if(!player)return;
   player.augmentMenuOpen=open;player.augmentMenuAt=0;
+  player.augmentPaused=open&&!map.sharedArena(player.id);
 }
 export async function chooseAugment(id) {
   if(!player)return;
   const current=player;
   await map.chooseAugment(current,id);
   current.augmentMenuOpen=current.augments.length<offerCount(current.lv);
+  current.augmentPaused=current.augmentMenuOpen&&!map.sharedArena(current.id);
   addEffect('level',current.pos,'증강 획득');
 }
 export async function rerollAugment(index) {
@@ -80,10 +82,10 @@ export default function Canvas({myref, onStatus}) {
       canvas.width = Math.round(size.width * size.dpr);
       canvas.height = Math.round(size.height * size.dpr);
     };
-    const input = bindGameInput(window, () => !!player && !player.augmentMenuOpen, activateSkill);
+    const input = bindGameInput(window, () => !!player && !player.augmentPaused, activateSkill);
     resize();
     window.addEventListener('resize', resize);
-    const status = setInterval(() => onStatus(player ? {name: player.name, hp: player.hp, hpmax: player.hpmax, xp: player.xp, lv: player.lv, skills: skillSnapshot(player, performance.now()), direction:player.skills.direction, enemies:map.enemyList.length, augments:[...player.augments], augmentMenuOpen:player.augmentMenuOpen, augmentOffer:player.augmentOffer||null, spells:player.spells, threat:map.threat} : null, socket.connected), 100);
+    const status = setInterval(() => onStatus(player ? {name: player.name, hp: player.hp, hpmax: player.hpmax, xp: player.xp, lv: player.lv, skills: skillSnapshot(player, performance.now()), direction:player.skills.direction, enemies:map.enemyList.length, augments:[...player.augments], augmentMenuOpen:player.augmentMenuOpen, augmentLive:!!player.augmentMenuOpen&&!player.augmentPaused, augmentOffer:player.augmentOffer||null, spells:player.spells, threat:map.threat} : null, socket.connected), 100);
     const render = time => {
       const dt=previousTime===undefined?1/60:Math.min(1/30,Math.max(0,(time-previousTime)/1000));
       previousTime=time;

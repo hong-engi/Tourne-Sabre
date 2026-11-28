@@ -127,6 +127,11 @@ button.augment-card:disabled { cursor: default; opacity: .6; }
 .augment-owned-name { font-size: 13px; font-weight: 600; color: #e3ece1; }
 .augment-owned-desc { font-size: 11px; line-height: 1.45; color: #9fb4a9; }
 @media(max-width:700px) { .augment-offer { grid-template-columns: 1fr; } .augment-card { min-height: 0; } }
+/* Multiplayer: the room keeps running, so the picker docks low and lets the arena show through. */
+.augment-overlay-live { place-items: end center; background: transparent; pointer-events: none; }
+.augment-overlay-live .augment-panel { pointer-events: auto; max-height: 58dvh; background: #102029e6; }
+.augment-overlay-live .augment-card { min-height: 0; }
+.augment-live-note { margin: -8px 0 14px; padding: 8px 12px; font-size: 12px; color: #ffd98a; background: #3a2c1240; border-left: 3px solid #ffb84a; }
 @media(max-width:540px) { .augment-overlay { padding: 12px; } .augment-panel { padding: 16px; } .augment-header h2 { font-size: 20px; } .augment-header p { font-size: 10px; } }
 
 /* Lobby loadout: QWER skills and D/F spells; each slot opens the picker. */

@@ -12,9 +12,10 @@ Tourne-Sabre runs as a single Node.js service (Express API + Socket.IO + static 
   - Uses `REACT_APP_API_URL` if set.
   - On local dev/preview ports (`:3000`, `:3001`), connects to `:8080` on the same hostname.
   - On unified single-port deploys (Render, Fly.io, or `http://localhost:8080`), uses `window.location.origin` for both REST and Socket.IO.
-- **Database (`MONGODB_URI`)**:
-  - Defaults to `mongodb://127.0.0.1:27017/tourne_sabre_local`.
-  - Startup clears player/item collections and seeds 1,000 arena items once connected.
+- **Live State & Transport (`backend/src/db/`, `backend/src/app.js`)**:
+  - Live player and item state runs in server memory (`playerdb`/`itemdb`) with zero per-tick database round-trips; startup seeds 1,000 arena items immediately.
+  - Real-time sync (arena snapshots, player movement, attacks, spells, augments, and incremental item respawns) streams over Socket.IO; REST `/map/*` endpoints remain backed by the same in-memory store as a fallback and for `supervisor.js`.
+  - No external database is required for live gameplay (`MONGODB_URI` is optional/unused for live match state).
 
 ## Local Verification
 

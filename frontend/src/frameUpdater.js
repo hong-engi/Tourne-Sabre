@@ -23,6 +23,18 @@ export function gainXp(me,xp,now=performance.now()){
   // Opening the picker covers the arena, so leave the visual cue time to read.
   me.augmentMenuAt=me.augmentMenuAt||now+LEVEL_UP_MENU_DELAY;
 }
+// Opens a scheduled picker and returns whether it pauses this frame. With
+// other players around the picker never pauses, so it does not pop up on its
+// own either: the pending badge waits for the player to open it.
+export function updateAugmentMenu(me,now,shared){
+  if(me.augmentMenuAt&&now>=me.augmentMenuAt){
+    me.augmentMenuAt=0;
+    if(shared)addEffect('level',me.pos,'증강 선택 가능');
+    else me.augmentMenuOpen=true;
+  }
+  me.augmentPaused=!!me.augmentMenuOpen&&!shared;
+  return me.augmentPaused;
+}
 function hitEffect(hit){
   if(hit.burst)return addEffect(hit.burst,hit,'');
   if(hit.blocked)return addEffect('shield',hit,'방어');
@@ -36,8 +48,7 @@ function hitEffect(hit){
 export default function frameUpdate(me,keys,myref,now=performance.now(),dt=1/30){
   if(!me)return;
   if(me.dead()){map.kill(me);death(myref);return;}
-  if(me.augmentMenuAt&&now>=me.augmentMenuAt){me.augmentMenuAt=0;me.augmentMenuOpen=true;}
-  if(me.augmentMenuOpen){map.sync(me,now);return;}
+  if(updateAugmentMenu(me,now,!!(map.sharedArena&&map.sharedArena(me.id)))){map.sync(me,now);return;}
   const mod=modifiers(me.augments);
   const ghost=now<(me.skills.spellUntil.ghost||0)||!!me.combatState?.ghost;
   setWorld(map.enemyList);

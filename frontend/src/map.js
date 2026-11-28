@@ -138,13 +138,38 @@ class MapState {
     socket.on('items:init',rows=>this.applyItemList(rows));
     socket.on('items:patch',rows=>this.applyItemPatch(rows));
     socket.on('arena:state',data=>this.applyArenaState(data,performance.now()));
+    socket.on('arena:me',row=>{
+      if(this.activePlayer&&row&&row._id===this.activePlayer.id)this.applyRecord(this.activePlayer,row);
+    });
     socket.on('player:record',row=>{
       if(this.activePlayer&&row&&row._id===this.activePlayer.id)this.applyRecord(this.activePlayer,row);
     });
     socket.on('connect',()=>{
-      if(this.activePlayer)socket.emit('newplayer',this.activePlayer.id);
+      const player=this.activePlayer;
+      // After a reconnect, reclaim our player; rejoin if the server lost it.
+      if(player)socket.emit('newplayer',player.id,res=>{if(res&&res.known===false)this.rejoin(player);});
       if(!this.itemList.length)socket.emit('items:sync',rows=>this.applyItemList(rows));
     });
+    socket.on('player:missing',()=>{if(this.activePlayer)this.rejoin(this.activePlayer);});
+  }
+  // Re-register a living player the server no longer knows (server restart,
+  // dropped connection), keeping its level, health and augments.
+  async rejoin(player){
+    if(this.rejoining||!player||player.hp<=0||!this.hasLiveSocket())return;
+    this.rejoining=true;
+    try{
+      const res=await this.emitWithAck('player:join',{...compactPlayerJoin(player),augments:[...(player.augments||[])],rejoin:true});
+      if(res&&res.ok&&this.activePlayer===player){
+        this.playerList=res.players||this.playerList;
+        if(res.player)this.applyRecord(player,res.player);
+      }
+    }catch(err){console.warn('Rejoin:',err.message);}
+    finally{this.rejoining=false;}
+  }
+  // True when another living player shares the arena: the augment picker
+  // then must not pause the game (PvP).
+  sharedArena(id){
+    return this.playerList.some(p=>p&&p.hp>0&&p._id!==id);
   }
   hasLiveSocket(){
     return !!(this.socket&&this.socket.connected);

@@ -79,7 +79,7 @@ function castSpell(player,spell,now) {
 // run network work such as the heal), or false when nothing was cast.
 export function activate(player,code,now) {
   const s=player.skills;
-  if (!s || player.hp<=0 || player.augmentMenuOpen) return false;
+  if (!s || player.hp<=0 || player.augmentPaused) return false;
   const spell=spellFor(player,code);
   if (spell) return castSpell(player,spell,now)?spell.id:false;
   const skill=skillFor(player,code),mod=modifiers(player.augments);

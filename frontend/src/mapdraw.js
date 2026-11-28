@@ -4,7 +4,7 @@ import knightUrl from './assets/pixel/knight.png';
 import enemyUrl from './assets/pixel/enemy.png';
 import chargerUrl from './assets/pixel/charger.png';
 import shellbackUrl from './assets/pixel/shellback.png';
-import lancerUrl from './assets/pixel/lancer.png';
+import lancerUrl from './assets/pixel/lancer-body.png';
 import lancerSpearUrl from './assets/pixel/lancer-spear.png';
 import fleaUrl from './assets/pixel/flea.png';
 import bannerUrl from './assets/pixel/banner.png';
@@ -670,13 +670,9 @@ function drawEnemy(ctx, raw, me, size, time, reduced) {
     else if(e.role==='guard')circle(ctx,0,0,e.r+8,'rgba(140,195,255,.16)','#9ec6ff',3);
     else circle(ctx,0,0,e.r+6,'rgba(255,130,90,.1)','#ff9870aa',2);
   }
-  if(e.type==='lancer'&&e.spearExt>0.01){
-    const reach=270*e.spearExt;
-    ctx.save();
-    ctx.rotate((e.facing||0)+Math.PI/2);
-    ctx.strokeStyle=`rgba(235,244,255,${.7*e.spearExt})`;ctx.lineWidth=4;
-    ctx.beginPath();ctx.moveTo(0,-e.r);ctx.lineTo(0,-reach);ctx.stroke();
-    sprite(ctx,'lancerSpear',-16,-reach-6,32,Math.max(80,reach));
+  if(e.type==='lancer'&&!e.unarmed){
+    ctx.save();ctx.rotate((e.facing||0)+Math.PI/2);
+    sprite(ctx,'lancerSpear',e.r*.55,-78,28,84);
     ctx.restore();
   }
   if(e.type==='lantern'&&e.phase==='closed'){

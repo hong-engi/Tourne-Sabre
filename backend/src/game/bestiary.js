@@ -122,10 +122,10 @@ const AI={
   },
   // 03 Sickler: the sickle flies out, pierces, and zips back along the same line.
   sickler(A,e,c){
-    cycle(A,e,c,{windup:600,active:1390,recover:500,cooldown:1200,ready:()=>c.dist<420,
+    cycle(A,e,c,{windup:600,active:1850,recover:500,cooldown:1200,ready:()=>c.dist<420,
       start:()=>{aimAt(e,c);A.addHazard(e,{kind:'line',x:e.x,y:e.y,angle:e.facing,length:340,width:24,armAt:c.now+600,until:c.now+600,damage:0,telegraph:true,bar:true});},
       strike:()=>A.addShot(e,{kind:'sickle',x:e.x+e.aimX*(e.r+8),y:e.y+e.aimY*(e.r+8),vx:e.aimX*340,vy:e.aimY*340,r:11,
-        damage:dmg(A,e,13,c.now),until:c.now+1390,returnAt:c.now+950,returnSpeed:2.2,pierce:true})});
+        damage:dmg(A,e,13,c.now),until:c.now+1850,returnAt:c.now+950,returnSpeed:2.2,pierce:true})});
     e.unarmed=e.phase==='active';
     if (e.phase==='hunt') {keepRange(e,c,320,90);aimAt(e,c);} else stop(e);
   },
