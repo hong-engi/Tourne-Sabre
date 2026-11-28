@@ -27,3 +27,12 @@ test('charge extrapolation stops at its destination and recovery hides the lane'
   const e=m.sample(1500)[0];expect(e.x).toBe(286);expect(chargeTelegraph(e).length).toBe(0);
   expect(chargeTelegraph({...e,phase:'recover'})).toBeNull();
 });
+test('bomber fuseLeft and spitter aim interpolate smoothly between snapshots',()=>{
+  const m=new MotionBuffer(100);
+  m.push([{id:'b',x:0,y:0,fuseLeft:900,aimX:1,aimY:0}],1000);
+  m.push([{id:'b',x:0,y:0,fuseLeft:800,aimX:0,aimY:1}],1100);
+  const [s]=m.sample(1150);
+  expect(s.fuseLeft).toBeCloseTo(850);
+  expect(s.aimX).toBeCloseTo(Math.SQRT1_2,2);
+  expect(s.aimY).toBeCloseTo(Math.SQRT1_2,2);
+});

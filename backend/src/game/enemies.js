@@ -14,8 +14,10 @@ const PUSH_DRAG=5,MOVE_RECOVERY=4;
 // Every THREAT_STEP_MS of a running room raises the threat level by one:
 // tougher, harder-hitting, slightly faster enemies that spawn more often.
 const THREAT_STEP_MS=40000;
-const BOMB_RADIUS=115,BOMB_TRIGGER=40,BOMB_FUSE_MS=900,SPIT_AIM_MS=550,SPIT_EVERY_MS=2300,SPIT_SPEED=260;
-const STALKER_RANGE=520,STALKER_RAMP_RATE=95,STALKER_MAX_EXTRA=400,STALKER_MAX_SPEED=520;
+const BOMB_RADIUS=115,BOMB_TRIGGER=40,BOMB_FUSE_MS=900,SPIT_AIM_MS=550,SPIT_EVERY_MS=2300,SPIT_SPEED=260,SPIT_FAST_SPEED=460;
+const STALKER_RANGE=520,STALKER_RAMP_RATE=38,STALKER_MAX_EXTRA=400,STALKER_MAX_SPEED=520;
+const SPLITTER_HOP_MS=650,SPLITTER_DRAG=3.2,SPLITTER_BURST=3.1;
+const MITE_HOP_MS=380,MITE_DRAG=4.2,MITE_BURST=2.2;
 const TYPES = {
   spinner:  {r:24,hp:30,speed:62, xp:55,contact:13,unlock:1,mass:1.0},
   charger:  {r:29,hp:45,speed:38, xp:80,contact:13,unlock:1,mass:1.8},
@@ -194,6 +196,13 @@ class EnemyArena {
         if (!h.tick&&h.hitIds.includes(id)) continue;
         if (!this.hazardTouches(h,p.x,p.y,p.r||25,now)) continue;
         if (h.dot) {this.applyDot(id,`${h.sourceType}:burn`,h.damage,500,1600,now);continue;}
+        if (h.poison && h.tick) {
+          h.tickAt=h.tickAt||{};
+          if (now<(h.tickAt[id]||0)) continue;
+          h.tickAt[id]=now+(h.tickMs||250);
+          damage.push({id,amount:h.damage,source:`${h.sourceType}:poison`});
+          continue;
+        }
         if (!this.tryHit(id,h.tick?h.id:h.sourceId,now)) continue;
         h.hitIds.push(id);damage.push({id,amount:h.damage,source:`${h.sourceType}:hazard`});
         if (h.bleed) this.applyBleed(id,Math.max(2,Math.round(h.damage*.3)),now);
@@ -405,7 +414,7 @@ class EnemyArena {
     if (!players.length) {
       // Everyone is choosing an augment: freeze the room, including its clock.
       const shift=dt*1000;
-      this.enemies.forEach(e=>{for (const k of ['nextShot',...bestiary.TIME_FIELDS]) if (e[k]) e[k]+=shift;e.vx=0;e.vy=0;e.angularVelocity=0;});
+      this.enemies.forEach(e=>{for (const k of ['nextShot','nextHop',...bestiary.TIME_FIELDS]) if (e[k]) e[k]+=shift;e.vx=0;e.vy=0;e.angularVelocity=0;});
       this.projectiles.forEach(s=>{s.until+=shift;if (s.returnAt) s.returnAt+=shift;if (s.landAt) s.landAt+=shift;if (s.pauseAt) s.pauseAt+=shift;if (s.launchAt) s.launchAt+=shift;});
       this.hazards.forEach(h=>{h.armAt+=shift;h.until+=shift;h.born+=shift;});
       this.nextSpawn+=dt*1000;if(this.startedAt!==null)this.startedAt+=dt*1000;
@@ -521,14 +530,19 @@ class EnemyArena {
         const speed=e.phase==='fuse'?0:base;
         e.vx=nx*speed;e.vy=ny*speed;
       } else if (e.type === 'spitter') {
+        // Always track the player's angle, including while aiming.
+        e.aimX=nx;e.aimY=ny;
+        const charged=(e.shotCount||0)%3===2;
+        e.charged=charged;
         if (e.phase === 'aim' && now >= e.phaseUntil) {
+          const speed=charged?SPIT_FAST_SPEED:SPIT_SPEED;
           this.projectiles.push({id:`s-${++this.sequence}`,owner:'enemy',sourceId:e.id,x:e.x+e.aimX*(e.r+6),y:e.y+e.aimY*(e.r+6),
-            vx:e.aimX*SPIT_SPEED,vy:e.aimY*SPIT_SPEED,r:9,sourceType:'spitter:shot',damage:this.outgoing(e,14*e.power,now),until:now+2600});
+            vx:e.aimX*speed,vy:e.aimY*speed,r:9,kind:charged?'spitRed':undefined,sourceType:'spitter:shot',damage:this.outgoing(e,14*e.power,now),until:now+2600});
+          e.shotCount=(e.shotCount||0)+1;
+          e.charged=e.shotCount%3===2;
           e.phase='hunt';e.nextShot=now+SPIT_EVERY_MS;
         }
-        if (e.phase === 'hunt' && now >= e.nextShot && dist < 560) {e.phase='aim';e.phaseUntil=now+SPIT_AIM_MS;e.aimX=nx;e.aimY=ny;}
-        // Always face the target; the aim locks while winding up a shot.
-        if (e.phase !== 'aim') {e.aimX=nx;e.aimY=ny;}
+        if (e.phase === 'hunt' && now >= e.nextShot && dist < 560) {e.phase='aim';e.phaseUntil=now+SPIT_AIM_MS;}
         // Hold a firing distance and circle, steering smoothly: the wanted
         // velocity changes continuously and the actual one eases toward it,
         // so the spitter never snaps between backing off, stopping and closing in.
@@ -541,13 +555,37 @@ class EnemyArena {
         e.moveVx=(e.moveVx||0)+(tx-(e.moveVx||0))*ease;e.moveVy=(e.moveVy||0)+(ty-(e.moveVy||0))*ease;
         e.vx=e.moveVx;e.vy=e.moveVy;
       } else if (e.type === 'splitter') {
-        e.vx = nx * base; e.vy = ny * base;
+        if (e.recoveringMovement) {
+          e.hopVx=0;e.hopVy=0;e.nextHop=0;
+          e.vx = nx * base; e.vy = ny * base;
+        } else {
+          if (!e.nextHop || now >= e.nextHop) {
+            e.hopVx = nx * base * SPLITTER_BURST; e.hopVy = ny * base * SPLITTER_BURST;
+            e.nextHop = now + SPLITTER_HOP_MS;
+          } else {
+            const hopDecay = Math.exp(-SPLITTER_DRAG * dt);
+            e.hopVx = (e.hopVx || 0) * hopDecay; e.hopVy = (e.hopVy || 0) * hopDecay;
+          }
+          e.vx = e.hopVx; e.vy = e.hopVy;
+        }
       } else if (e.type === 'mite') {
         if (e.phase === 'dash' && now < e.phaseUntil) {
           e.vx = e.aimX * 420 * slow; e.vy = e.aimY * 420 * slow;
         } else {
-          if (e.phase === 'dash') e.phase = 'hunt';
-          e.vx = nx * base; e.vy = ny * base;
+          if (e.phase === 'dash') {e.phase = 'hunt';e.nextHop = 0;}
+          if (e.recoveringMovement) {
+            e.hopVx=0;e.hopVy=0;e.nextHop=0;
+            e.vx = nx * base; e.vy = ny * base;
+          } else {
+            if (!e.nextHop || now >= e.nextHop) {
+              e.hopVx = nx * base * MITE_BURST; e.hopVy = ny * base * MITE_BURST;
+              e.nextHop = now + MITE_HOP_MS;
+            } else {
+              const hopDecay = Math.exp(-MITE_DRAG * dt);
+              e.hopVx = (e.hopVx || 0) * hopDecay; e.hopVy = (e.hopVy || 0) * hopDecay;
+            }
+            e.vx = e.hopVx; e.vy = e.hopVy;
+          }
         }
       } else {
         const radial = dist < 150 ? -.4 : 1;
@@ -556,7 +594,7 @@ class EnemyArena {
       }
       const staggered=now<(e.staggerUntil||0);
       if(staggered){
-        e.moveVx=0;e.moveVy=0;e.vx=0;e.vy=0;e.recoveringMovement=true;
+        e.moveVx=0;e.moveVy=0;e.hopVx=0;e.hopVy=0;e.nextHop=0;e.vx=0;e.vy=0;e.recoveringMovement=true;
         // A launched charger must follow the impulse too, rather than its
         // fixed charge endpoint overriding the knockback displacement.
         if(e.type==='charger'&&e.phase==='charge'){
@@ -901,6 +939,13 @@ class EnemyArena {
       row.leapDir=e.vx<0?-1:1;
     }
     if (e.type==='egg'&&e.hatchAt) {row.hatchLeft=Math.max(0,e.hatchAt-now);row.hatchTotal=2200;}
+    if (e.type==='lancer'&&e.phase==='active'&&e.thrustStart&&e.phaseUntil>e.thrustStart) {
+      const t=Math.max(0,Math.min(1,(now-e.thrustStart)/(e.phaseUntil-e.thrustStart)));
+      row.spearExt=t<.22?t/.22:t<.65?1:Math.max(0,1-(t-.65)/.35);
+    }
+    if (e.type==='shroom'&&e.tpAt&&now-e.tpAt<450) {
+      row.tpFromX=e.tpFromX;row.tpFromY=e.tpFromY;row.tpProgress=(now-e.tpAt)/450;
+    }
     return row;
   });}
   state(now) {
@@ -913,7 +958,7 @@ class EnemyArena {
       blasts:this.blasts.map(({id,x,y,r})=>({id,x,y,r})),threat:this.threat(now),
       // Player skill areas, drawn in the owner's colours (timing relative).
       skillZones:this.zones.filter(z=>z.power>0||z.status||z.pull||z.sanctum||z.banner).map(z=>({id:z.id,owner:z.owner,skill:z.skill,kind:z.shape,x:z.x,y:z.y,r:z.r,angle:z.angle,length:z.len,width:z.w,spread:z.spread,
-        armIn:z.armAt-now,left:z.until-now,warn:!!z.warn,support:!!(z.sanctum||z.banner)})),
+        age:now-z.born,every:z.every,tag:z.tag,bladeAngle:z.bladeAngle,spinDirection:z.spinDirection,armIn:z.armAt-now,left:z.until-now,warn:!!z.warn,support:!!(z.sanctum||z.banner)})),
       walls:this.walls.map(w=>({id:w.id,owner:w.owner,x:w.x,y:w.y,angle:w.angle,length:w.len,width:w.w,left:w.until-now})),
       decoys:this.decoys.map(d=>({id:d.id,owner:d.owner,x:d.x,y:d.y,left:d.until-now})),
       physics:Object.fromEntries(this.physicsLedger||[])};

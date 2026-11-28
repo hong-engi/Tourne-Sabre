@@ -15,7 +15,6 @@ const {hazardForces}=require('./hazardGeometry');
 
 const API='http://localhost:8080/lab';
 const TIERS=[['all','전체'],['legacy','기존'],['normal','일반'],['elite','정예'],['boss','보스'],['noted','메모 있음']];
-const STATUS=[['note','메모'],['todo','수정 요청'],['done','반영됨']];
 const LEGACY=new Set(['spinner','charger','stalker','bomber','spitter','splitter','mite']);
 const POLL_MS=33;
 const INTERP_DELAY=90;
@@ -148,17 +147,16 @@ const LabStage=React.memo(function LabStage({type,tier,scenes,reduced,cameraMode
   },[type,tier,scenes,reduced,cameraMode,playable,meRef,keysRef]);
   return <div className="lab-stage" ref={wrapRef}>
     <canvas ref={canvasRef} className="lab-stage-canvas" aria-label={`${ENEMY_NAMES[type]||type} 실시간 전투`}/>
-    {playable&&<div className="lab-controls-hint">방향키 이동 · Q 역회전 · W 가속 · E 찌르기 · R 거대화 · D/F 주문</div>}
+    {playable&&<div className="lab-controls-hint">방향키 이동 · Q 역회전 · W 가속 · E 찌르기 · R 거대화 · D/F 주문 · ⌘+방향키 적 전환</div>}
   </div>;
 });
 
 function NoteEditor({type,note,onSave}){
   const [text,setText]=useState(note?.text||'');
-  const [status,setStatus]=useState(note?.status||'note');
   const [saved,setSaved]=useState('saved');
-  const timer=useRef(null),latest=useRef({text,status});
-  latest.current={text,status};
-  useEffect(()=>{setText(note?.text||'');setStatus(note?.status||'note');setSaved('saved');},[type]); // eslint-disable-line react-hooks/exhaustive-deps
+  const timer=useRef(null),latest=useRef({text});
+  latest.current={text};
+  useEffect(()=>{setText(note?.text||'');setSaved('saved');},[type]); // eslint-disable-line react-hooks/exhaustive-deps
   const save=useCallback(async(next=latest.current)=>{
     clearTimeout(timer.current);setSaved('saving');
     try{await onSave(type,next);setSaved('saved');}catch(err){setSaved('error');}
@@ -168,13 +166,10 @@ function NoteEditor({type,note,onSave}){
   return <div className="lab-note">
     <div className="lab-note-head">
       <label htmlFor="lab-note-text">수정 메모</label>
-      <select value={status} aria-label="메모 상태" onChange={e=>{setStatus(e.target.value);save({text,status:e.target.value});}}>
-        {STATUS.map(([v,l])=><option key={v} value={v}>{l}</option>)}
-      </select>
       <span className={`lab-saved ${saved}`}>{{saved:'저장됨',saving:'저장 중…',dirty:'입력 중',error:'저장 실패'}[saved]}</span>
     </div>
     <textarea id="lab-note-text" value={text} placeholder="예: 창 찌르기 예고가 너무 짧음. 0.8초 → 1.1초로. 회복 중 피격 판정 커지게."
-      onChange={e=>{setText(e.target.value);schedule({text:e.target.value,status});}}
+      onChange={e=>{setText(e.target.value);schedule({text:e.target.value});}}
       onBlur={()=>saved==='dirty'&&save()}
       onKeyDown={e=>{if((e.metaKey||e.ctrlKey)&&e.key==='s'){e.preventDefault();save();}}}/>
     <p className="lab-hint">자동 저장 · ⌘/Ctrl+S · 저장 위치 <code>ENEMY_NOTES.json</code></p>
@@ -240,6 +235,10 @@ export default function EnemyLab(){
             scene=await res.json();at=performance.now();
             if(stop)return;
             (scene.attackHits||[]).forEach(showLabHit);
+            for(const c of scene.corrections||[]){
+              me.pos.x+=c.dx||0;me.pos.y+=c.dy||0;
+              me.speed.x+=(c.dvx||0)/30;me.speed.y+=(c.dvy||0)/30;
+            }
             if(scene.damageTaken>0){
               addEffect('hurt',me.pos,`−${scene.damageTaken}`);
               me.hp-=scene.damageTaken;
@@ -255,7 +254,7 @@ export default function EnemyLab(){
           if(scene){
             let entry=scenes.current[selected];
             if(!entry){
-              entry={enemyMotion:new MotionBuffer(INTERP_DELAY),dummyMotion:new MotionBuffer(INTERP_DELAY),projectiles:{list:[],at:0}};
+              entry={enemyMotion:new MotionBuffer(INTERP_DELAY),dummyMotion:new MotionBuffer(INTERP_DELAY),projectiles:{list:[],at:0},seenBlasts:new Set()};
               scenes.current[selected]=entry;
             }
             entry.scene=scene;
@@ -263,6 +262,12 @@ export default function EnemyLab(){
             entry.enemyMotion.push(scene.enemies||[],at);
             entry.dummyMotion.push([{id:'lab-dummy',...scene.dummy,sw_speed:-3.1}],at);
             entry.projectiles=mergeShots(entry.projectiles,scene.projectiles||[],at);
+            for(const blast of scene.blasts||[]){
+              if(entry.seenBlasts.has(blast.id))continue;
+              entry.seenBlasts.add(blast.id);
+              addEffect('bomb',blast,'');
+            }
+            if(entry.seenBlasts.size>200)entry.seenBlasts=new Set([...entry.seenBlasts].slice(-50));
             const next={hits:scene.hits,damage:scene.damage};
             setStats(s=>{
               const prev=s[selected];
@@ -295,12 +300,14 @@ export default function EnemyLab(){
     const onKey=e=>{
       if(e.target.tagName==='TEXTAREA'||e.target.tagName==='INPUT'||e.target.tagName==='SELECT')return;
       if(e.key==='Escape')setSelected(null);
-      else if(!playable&&selected&&shown.length>1&&e.key==='ArrowLeft'){
-        const idx=shown.findIndex(t=>t.type===selected);
-        if(idx>=0)setSelected(shown[(idx-1+shown.length)%shown.length].type);
-      } else if(!playable&&selected&&shown.length>1&&e.key==='ArrowRight'){
-        const idx=shown.findIndex(t=>t.type===selected);
-        if(idx>=0)setSelected(shown[(idx+1)%shown.length].type);
+      else if(selected&&shown.length>1){
+        const prev=(e.metaKey&&(e.key==='ArrowLeft'||e.key==='ArrowUp'))||(!playable&&!e.metaKey&&e.key==='ArrowLeft');
+        const next=(e.metaKey&&(e.key==='ArrowRight'||e.key==='ArrowDown'))||(!playable&&!e.metaKey&&e.key==='ArrowRight');
+        if(prev||next){
+          e.preventDefault();
+          const idx=shown.findIndex(t=>t.type===selected);
+          if(idx>=0)setSelected(shown[(idx+(next?1:-1)+shown.length)%shown.length].type);
+        }
       }
     };
     window.addEventListener('keydown',onKey);return ()=>window.removeEventListener('keydown',onKey);
@@ -314,7 +321,7 @@ export default function EnemyLab(){
   },[]);
   const reset=type=>{
     const entry=scenes.current[type];
-    if(entry){entry.enemyMotion.clear();entry.dummyMotion.clear();entry.projectiles={list:[],at:0};entry.resetCamera=true;}
+    if(entry){entry.enemyMotion.clear();entry.dummyMotion.clear();entry.projectiles={list:[],at:0};entry.seenBlasts?.clear();entry.resetCamera=true;}
     if(playable){meRef.current=makeLabPlayer();resetEffects();}
     return fetch(`${API}/reset/${type}`,{method:'POST'});
   };
@@ -342,7 +349,7 @@ export default function EnemyLab(){
     {error&&<p className="lab-error" role="alert">{error}</p>}
     {showAll&&<section className="lab-allnotes" aria-label="모든 메모">
       {noted.length?noted.map(([t,n])=><button key={t} onClick={()=>{setSelected(t);setShowAll(false);}}>
-        <b>{ENEMY_NAMES[t]||t}</b><span className={`lab-status ${n.status}`}>{STATUS.find(s=>s[0]===n.status)?.[1]}</span><p>{n.text}</p></button>)
+        <b>{ENEMY_NAMES[t]||t}</b><p>{n.text}</p></button>)
         :<p className="lab-hint">아직 메모가 없습니다.</p>}
     </section>}
     <ul className={`lab-grid${current?' hidden':''}`}>
@@ -353,7 +360,7 @@ export default function EnemyLab(){
             <LabPortrait info={t} width={232} height={150}/>
             <span className="lab-card-title">
               <b>{ENEMY_NAMES[t.type]||t.type}</b>
-              {note&&<i className={`lab-dot ${note.status}`} title={STATUS.find(s=>s[0]===note.status)?.[1]}/>}
+              {note&&<i className="lab-dot" title="메모 있음"/>}
               <span className={`lab-tier ${labGroup(t)}`}>{TIERS.find(x=>x[0]===labGroup(t))?.[1]}</span>
             </span>
             <span className="lab-card-sub">{ENEMY_SUMMARY[t.type]}</span>
@@ -381,8 +388,8 @@ export default function EnemyLab(){
           <label><input type="checkbox" checked={reduced} onChange={e=>setReduced(e.target.checked)}/> 모션 감소</label>
           <button className="lab-ghost" onClick={()=>reset(current.type)}>처음부터</button>
           {shown.length>1&&<div className="lab-nav">
-            <button className="lab-ghost" onClick={()=>stepSelected(-1)} aria-label="이전 적">←</button>
-            <button className="lab-ghost" onClick={()=>stepSelected(1)} aria-label="다음 적">→</button>
+            <button className="lab-ghost" onClick={()=>stepSelected(-1)} aria-label="이전 적" title="이전 적 (⌘+←/↑)">←</button>
+            <button className="lab-ghost" onClick={()=>stepSelected(1)} aria-label="다음 적" title="다음 적 (⌘+→/↓)">→</button>
           </div>}
           <button className="lab-close" onClick={()=>setSelected(null)} aria-label="목록으로">×</button>
         </div>

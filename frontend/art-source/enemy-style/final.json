@@ -1,0 +1,58 @@
+{
+  "bomber": {
+    "size": [
+      48,
+      48
+    ],
+    "colors": 7
+  },
+  "spitter": {
+    "size": [
+      48,
+      48
+    ],
+    "colors": 8
+  },
+  "splitter": {
+    "size": [
+      36,
+      36
+    ],
+    "colors": 8
+  },
+  "mite": {
+    "size": [
+      36,
+      36
+    ],
+    "colors": 7
+  },
+  "shellback": {
+    "size": [
+      46,
+      47
+    ],
+    "colors": 10
+  },
+  "shotbug": {
+    "size": [
+      35,
+      45
+    ],
+    "colors": 9
+  },
+  "skeleton": {
+    "size": [
+      48,
+      44
+    ],
+    "colors": 10
+  },
+  "alchemist": {
+    "size": [
+      56,
+      60
+    ],
+    "colors": 15
+  }
+}

@@ -156,10 +156,10 @@ test('stalker accelerates within range up to a cap and resets on hit',()=>{
   const s=arena.spawn(p,'stalker',1000,{x:350,y:0});s.hp=s.hpmax=100;
   arena.step([p],1050);
   const early=s.ramp;
-  for(let t=1150;t<=7000;t+=100){s.x=350;s.y=0;arena.step([p],t);}
+  for(let t=1150;t<=13000;t+=100){s.x=350;s.y=0;arena.step([p],t);}
   assert.ok(s.ramp>early,'ramps up while in range');
   assert.ok(Math.hypot(s.vx,s.vy)>450&&Math.hypot(s.vx,s.vy)<=560,'exceeds player speed but stays capped');
-  arena.damageEnemy(s,5,'human',{},7000);
+  arena.damageEnemy(s,5,'human',{},13000);
   assert.equal(s.ramp,0,'hit resets stalker ramp');
 });
 test('ghosted players pass through bodies without contact damage',()=>{
@@ -249,4 +249,42 @@ test('a charger still accelerates if its recovery phase outlasts knockback stagg
   assert.ok(firstSpeed>0&&firstSpeed<10,'pursuit starts slowly after the stationary phase');
   arena.step([p],1650);
   assert.ok(-(e.vx-e.pushVx)>firstSpeed);
+});
+
+test('spitter tracks player while aiming and fires a faster red shot every 3rd attack',()=>{
+  const arena=new EnemyArena(()=>0),p=player();arena.nextSpawn=Infinity;arena.startedAt=0;
+  const s=arena.spawn(p,'spitter',0,{x:300,y:0});s.nextShot=0;
+  let t=100;
+  for(let shot=1;shot<=3;shot++){
+    s.nextShot=t;arena.step([p],t);assert.equal(s.phase,'aim');
+    p.y=120;arena.step([p],t+200);
+    assert.ok(s.aimY>0,'aim tracks moving player during windup');
+    assert.equal(s.charged,shot===3);
+    arena.step([p],t+600);
+    const proj=arena.projectiles.at(-1);
+    const spd=Math.hypot(proj.vx,proj.vy);
+    if(shot<3){assert.ok(spd<300);assert.equal(proj.kind,undefined);}
+    else{assert.ok(spd>400,'3rd shot is faster');assert.equal(proj.kind,'spitRed');}
+    arena.projectiles=[];t+=3000;
+  }
+});
+
+test('splitter and mite move in repeated short hops with inertia coasting',()=>{
+  for(const type of ['splitter','mite']){
+    const arena=new EnemyArena(()=>0),p=player();arena.nextSpawn=Infinity;arena.startedAt=0;arena.lastTime=1000;
+    const e=arena.spawn(p,type,1000,{x:500,y:0});
+    arena.step([p],1050);const peak=Math.hypot(e.vx,e.vy);
+    arena.step([p],1200);const coast=Math.hypot(e.vx,e.vy);
+    assert.ok(peak>coast&&coast>0,`${type} coasts down after initial hop`);
+  }
+});
+
+test('charging charger knocks the player back strongly without being pushed itself',()=>{
+  const arena=new EnemyArena(()=>0),p=player();arena.nextSpawn=Infinity;arena.startedAt=0;arena.lastTime=1000;
+  const c=arena.spawn(p,'charger',1000,{x:-10,y:0});
+  c.phase='charge';c.phaseUntil=2000;c.aimX=1;c.aimY=0;c.chargeEndX=280;c.chargeEndY=0;
+  arena.step([p],1050);
+  const corr=arena.playerCorrections.find(x=>x.id===String(p._id));
+  assert.ok(corr&&corr.dvx>600,'player is knocked back strongly along charge');
+  assert.equal(c.pushVx||0,0,'charger is not pushed back');
 });

@@ -81,3 +81,21 @@ test('life anchor and causal knot save lethal hits once and move the player back
  assert.equal(a.shapeIncoming([p],[{id:'p',amount:999,source:'x'}],12000)[0].amount,65,'knot: 35%');
  assert.equal(a.shapeIncoming([p],[{id:'p',amount:999,source:'x'}],30000)[0].amount,999,'knot is once per run');
 });
+
+test('reverse echo retains the original blade direction and starts after the real turn',()=>{
+ const a=arena(),p=pl(['reverse','giant','accel','thrust'],['xQ01']);
+ a.attack({...p,bursts:[cast('reverse',{bladeAngle:1.2,spinDirection:-1})]},1000);
+ const z=a.zones.find(z=>z.tag==='afterSpin');
+ assert.equal(z.armAt,1300);assert.equal(z.until,1600);
+ assert.equal(z.bladeAngle,1.2);assert.equal(z.spinDirection,-1);
+ assert.equal(z.power,.8);assert.equal(z.ticksLeft,1);
+});
+
+test('skill area snapshots retain charge age and tick spacing for deterministic effects',()=>{
+ const a=arena(),p=pl(['bladeRain','iaido','accel','thrust']);
+ a.attack({...p,bursts:[cast('bladeRain'),cast('iaido')]},1000);
+ const zones=a.state(1200).skillZones;
+ const rain=zones.find(z=>z.skill==='bladeRain'),slash=zones.find(z=>z.skill==='iaido');
+ assert.equal(rain.age,200);assert.equal(rain.armIn,300);assert.equal(rain.every,500);assert.equal(rain.tag,'rain');
+ assert.equal(slash.age,200);assert.equal(slash.armIn,400);assert.equal(slash.warn,true);
+});

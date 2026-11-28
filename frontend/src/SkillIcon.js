@@ -18,12 +18,24 @@ import exhaust from './assets/pixel/skills/exhaust.png';
 import smite from './assets/pixel/skills/smite.png';
 import crescent from './assets/pixel/skills/crescent.png';
 import decoy from './assets/pixel/skills/decoy.png';
+import crossScar from './assets/pixel/skills/cross-scar.png';
+import needleRain from './assets/pixel/skills/needle-rain.png';
+import iaido from './assets/pixel/skills/iaido.png';
+import sawThrow from './assets/pixel/skills/saw-throw.png';
+import bloodSeal from './assets/pixel/skills/blood-seal.png';
+import horizon from './assets/pixel/skills/horizon.png';
+import parryStance from './assets/pixel/skills/parry-stance.png';
+import bladeVeil from './assets/pixel/skills/blade-veil.png';
+import ironStance from './assets/pixel/skills/iron-stance.png';
+import frostMail from './assets/pixel/skills/frost-mail.png';
+import bloodPact from './assets/pixel/skills/blood-pact.png';
 const {SKILLS:SKILL_DEFS,SPELLS:SPELL_DEFS}=require('./gameRules');
 const ALL_DEFS=SKILL_DEFS.concat(SPELL_DEFS);
 
 // Bind artwork to ability identity, so changing QWER / DF loadouts follows it.
 const ICONS = {reverse,giant,accel,thrust,dash,twinBlade,turret,boomerang,slam,
-  blink,ghost,heal,ignite,barrier,exhaust,smite,crescent,decoy};
+  blink,ghost,heal,ignite,barrier,exhaust,smite,crescent,decoy,
+  crossScar,needleRain,iaido,sawThrow,bloodSeal,horizon,parryStance,bladeVeil,ironStance,frostMail,bloodPact};
 const DEFAULT_KEYS = {KeyQ:'reverse',KeyW:'giant',KeyE:'accel',KeyR:'thrust'};
 export default function SkillIcon({id,code}) {
   const image=useRef(null);

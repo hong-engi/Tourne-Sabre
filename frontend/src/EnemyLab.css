@@ -30,8 +30,6 @@
 .lab-tier.boss{background:#3a1a18;color:#f3a08a}
 .lab-tier.legacy{background:#1b2535;color:#a4b8d6}
 .lab-dot{width:8px;height:8px;border-radius:50%;background:#9fb3d1}
-.lab-dot.todo,.lab-status.todo{background:#f0a070}
-.lab-dot.done,.lab-status.done{background:#8fd07a}
 .lab-modal{position:fixed;inset:0;z-index:20;background:#0c161c;display:flex;flex-direction:column;overflow:hidden}
 .lab-modal-bar{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:12px 16px;padding:12px 20px;border-bottom:1px solid #1d2e36;background:#0e1b22;flex-shrink:0}
 .lab-modal-title{display:flex;align-items:center;gap:10px}
@@ -55,7 +53,6 @@
 .lab-note{display:flex;flex-direction:column;gap:6px;flex:1}
 .lab-note-head{display:flex;align-items:center;gap:10px}
 .lab-note-head label{font-weight:600}
-.lab-note select{background:#13232b;color:#e4e9df;border:1px solid #22363f;border-radius:6px;padding:4px 6px;font:inherit;font-size:13px}
 .lab-saved{margin-left:auto;font-size:12px;color:#8fa59a}
 .lab-saved.error{color:#ff9b87}
 .lab-saved.dirty{color:#e6c87f}
@@ -64,7 +61,6 @@
 .lab-allnotes{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:10px;margin-bottom:16px}
 .lab-allnotes button{text-align:left;background:#111e24;border:1px solid #22363f;border-radius:8px;padding:10px;color:inherit;font:inherit;cursor:pointer}
 .lab-allnotes p{margin:6px 0 0;white-space:pre-wrap;color:#c9d4cc;font-size:13px;max-height:6.5em;overflow:hidden}
-.lab-status{font-size:11px;margin-left:8px;padding:1px 6px;border-radius:4px;background:#9fb3d1;color:#10201a}
 @media (max-width:960px){.lab-modal-body{grid-template-columns:1fr;grid-template-rows:minmax(300px,55vh) 1fr}.lab-sidebar{border-left:0;border-top:1px solid #1d2e36}}
 @media (prefers-reduced-motion:reduce){.lab *{transition:none}}
 

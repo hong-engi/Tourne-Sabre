@@ -109,11 +109,13 @@ class EnemyLab {
     dummy.skillState=input.skillState||{};
     dummy.hp=dummy.hpmax;
     let t=sim.clock,damageTaken=0;
+    const corrections=[];
     const target=Math.min(now,t+1500);
     while (t<target) {
       const dt=Math.min(33,target-t);t+=dt;
       arena.startedAt=t;// stay at threat 1
       const events=arena.step([dummy],t);
+      if (arena.playerCorrections.length) corrections.push(...arena.playerCorrections);
       for (const e of events) {sim.hits++;sim.damage+=e.amount;damageTaken+=e.amount;}
       if (!arena.enemies.some(e=>e.type===type&&e.hp>0)) {
         if (!sim.respawnAt) sim.respawnAt=t+1200;
@@ -132,7 +134,7 @@ class EnemyLab {
     for (const [key,other] of this.sims) if (now-other.seen>IDLE_DROP_MS) this.sims.delete(key);
     const state=arena.state(t);
     return {...state,type,dummy:{x:dummy.x,y:dummy.y,vx:dummy.vx||0,vy:dummy.vy||0,r:dummy.r,sw_angle:dummy.sw_angle,sw_r:dummy.sw_r,sw_w:dummy.sw_w,sw_h:dummy.sw_h},
-      hits:sim.hits,damage:sim.damage,damageTaken,attackHits:attackResult.hits||[]};
+      hits:sim.hits,damage:sim.damage,damageTaken,corrections,attackHits:attackResult.hits||[]};
   }
 }
 

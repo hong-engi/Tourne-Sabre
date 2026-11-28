@@ -16,6 +16,9 @@ def convert(batch, fixer_path):
     for name, size in batch.items():
         source = source_path(name)
         im = Image.open(source).convert('RGBA')
+        # ImageGen returned a pose sheet for masker. Select the first standing pose.
+        if name == 'masker':
+            im = im.crop((0, 0, 460, 535))
         alpha = im.getchannel('A').point(lambda a: 255 if a >= 128 else 0)
         im.putalpha(alpha)
         im = im.crop(alpha.getbbox())

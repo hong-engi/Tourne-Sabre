@@ -64,7 +64,7 @@ const SPECS={
 };
 // Timer fields shifted forward while the room is paused for augment choices.
 const TIME_FIELDS=['phaseUntil','nextShot','nextAttack','nextSpecial','expireAt','hatchAt','regrowAt','exposedUntil',
-  'leapAt','leapStart','arriveAt','cooledUntil','guardUntil','echoAt','vulnerableUntil','lootAt','blockFlashUntil','pulseAt','trailAt'];
+  'leapAt','leapStart','arriveAt','cooledUntil','guardUntil','echoAt','vulnerableUntil','lootAt','blockFlashUntil','pulseAt','trailAt','thrustStart','tpAt'];
 const ELITES=['warden','gatekeeper','duelist','alchemist'];
 const BOSSES=['swordsaint','forge','maestro','rootcrown','stormray','crab','centipede'];
 // Elite at threat 3, 8, 13...; boss at 5, 10, 15... (one each per room run).
@@ -112,9 +112,9 @@ const AI={
   },
   // 02 Lancer: stops at mid range, thrusts in a locked line, long recovery.
   lancer(A,e,c){
-    cycle(A,e,c,{windup:450,recover:850,cooldown:600,ready:()=>c.dist<280&&c.dist>90,
-      start:()=>{aimAt(e,c);A.addHazard(e,{kind:'line',x:e.x,y:e.y,angle:e.facing,length:270,width:26,armAt:c.now+450,until:c.now+600,damage:dmg(A,e,18,c.now),bar:true});},
-      strike:()=>A.addShot(e,{kind:'spear',x:e.x+e.aimX*(e.r+12),y:e.y+e.aimY*(e.r+12),vx:e.aimX*1050,vy:e.aimY*1050,r:12,damage:0,until:c.now+250,pierce:true})});
+    cycle(A,e,c,{windup:450,active:360,recover:850,cooldown:600,ready:()=>c.dist<280,
+      start:()=>{aimAt(e,c);A.addHazard(e,{kind:'line',x:e.x,y:e.y,angle:e.facing,length:270,width:26,armAt:c.now+450,until:c.now+810,damage:dmg(A,e,18,c.now),bar:true});},
+      strike:()=>{e.thrustStart=c.now;}});
     if (e.phase==='hunt') {keepRange(e,c,220,70,.4);aimAt(e,c);} else stop(e);
   },
   // 03 Sickler: the sickle flies out, pierces, and zips back along the same line.
@@ -157,8 +157,9 @@ const AI={
   // 05 Crack shroom: plants large long-lived poison patches and teleports away.
   shroom(A,e,c){
     cycle(A,e,c,{windup:900,recover:700,cooldown:2600,ready:()=>c.dist<280&&A.hazardCount(e.id)<3,
-      start:()=>A.addHazard(e,{kind:'circle',x:e.x,y:e.y,r:165,armAt:c.now+900,until:c.now+9900,damage:dmg(A,e,6,c.now),tick:true,poison:true}),
+      start:()=>A.addHazard(e,{kind:'circle',x:e.x,y:e.y,r:165,armAt:c.now+900,until:c.now+9900,damage:1,tick:true,tickMs:250,poison:true}),
       strike:()=>{
+        e.tpFromX=e.x;e.tpFromY=e.y;e.tpAt=c.now;
         const curA=Math.atan2(e.y-c.p.y,e.x-c.p.x),side=A.random()<.5?1:-1;
         const a=curA+side*(1.5+A.random()*1.0),d=220+A.random()*80;
         e.x=clamp(c.p.x+Math.cos(a)*d,-2850,2850);e.y=clamp(c.p.y+Math.sin(a)*d,-2850,2850);
@@ -196,7 +197,7 @@ const AI={
     if (e.phase==='recover'&&now>=e.phaseUntil) {e.phase='hunt';e.nextAttack=now+2200;}
     if (e.phase==='hunt'&&now>=(e.nextAttack||0)&&c.dist<230) {
       phase(e,'windup',500,now);aimAt(e,c);e.targetId=String(c.p._id);
-      A.addHazard(e,{kind:'line',x:e.x,y:e.y,angle:e.facing,length:190,width:32,armAt:now+500,until:now+800,damage:dmg(A,e,12,now),arrow:true});
+      A.addHazard(e,{kind:'line',x:e.x,y:e.y,angle:e.facing,length:190,width:32,armAt:now+500,until:now+500,damage:0,telegraph:true,arrow:true});
     }
     if (e.phase==='hunt'||e.phase==='recover') {
       const radial=clamp((c.dist-170)/60,-1,1);

@@ -28,6 +28,8 @@ textarea{flex:1;min-height:52px;padding:6px 8px;border:1px solid var(--line);bor
 <select id="f"><option value="">모두</option><option value="todo">미작성</option><option value="done">작성함</option></select>
 <span id="count"></span></header>
 <main id="list"></main>
+<script src="/reverseAfterimage.js"></script>
+<script src="/skillZoneFx.js"></script>
 <script>
 let items=[],fb={};
 const $=s=>document.querySelector(s);
@@ -38,7 +40,7 @@ const W=220,H=165,SC=.24,PX=W/2,PY=H*.74,DEFAULT_LOOP=2600;
 const TIER={silver:'#c9d1db',gold:'#f2c14e',prismatic:'#c58cff',transcendent:'#ff7ad9'};
 const FOES=[[0,-230],[-110,-170],[105,-300],[-40,-420]];
 function timeline(spec){let end=1200;
-  (spec.fx||[]).forEach(f=>{end=Math.max(end,(f.delay||0)+(f.ticks?f.ticks*(f.every||500):0)+(f.last||0)+500);});
+  (spec.fx||[]).forEach(f=>{end=Math.max(end,(f.delay||0)+Math.max((f.every||0)*((f.ticks||1)-1)+250,f.last||f.ms||0)+500);});
   if(spec.blades)end=Math.max(end,2600);return Math.min(Math.max(end+600,DEFAULT_LOOP),5200);}
 function moveAt(spec,t){ // player offset and where the move started/ended
   const m=spec.move;if(!m)return {x:0,y:0,end:{x:0,y:0}};
@@ -64,9 +66,9 @@ function draw(ctx,item,now){
   // zones / statuses
   let flash=0,slow=false;
   (spec.fx||[]).forEach(f=>{
-    const c=anchorPos(f,me,mv.end);const st=f.delay||0;
+    const c={...anchorPos(f,me,mv.end)};c.x+=f.side||0;c.y-=(f.drift||0)*Math.max(0,t)/1000;const st=f.delay||0;
     if(f.t!=='hit'){drawAux(ctx,f,t,P,me,accent);return;}
-    const live=(f.ticks?f.ticks*(f.every||500):0)+(f.last||0)+650;
+    const live=Math.max((f.every||0)*((f.ticks||1)-1)+250,f.last||0);
     const warn=t>=0&&t<st&&(f.warn||st>=300);const on=t>=st&&t<st+live;
     if(!warn&&!on)return;
     const fade=on?1-Math.min(1,(t-st)/live)*.7:.5;
@@ -74,7 +76,12 @@ function draw(ctx,item,now){
     if(on&&f.status&&f.status.slow||f.status&&f.status.root)slow=slow||on;
     const col=f.status&&(f.status.slow||f.status.root)&&!f.power?'120,200,255':f.status&&f.status.burn?'255,140,60':f.status&&f.status.bleed?'230,60,80':'255,235,170';
     ctx.save();const [cx,cy]=P(c.x,c.y);ctx.translate(cx,cy);
-    const ang=(f.angle||0);ctx.rotate(ang);if(f.side)ctx.translate(f.side*SC,0);
+    ctx.save();ctx.scale(SC,SC);
+    const rendered=skillZoneFx.draw(ctx,{skill:item.id==='xQ01'?'reverse':item.previewSkill||item.id,
+      tag:f.tag,kind:f.shape,angle:-Math.PI/2+(f.angle||0),r:f.r,length:f.len,width:f.w,spread:f.spread,
+      age:t,armIn:st-t,left:st+live-t,every:f.every,warn:f.warn},{reduced:reduce,tint:'120,230,220'});
+    ctx.restore();if(rendered){ctx.restore();return;}
+    const ang=(f.angle||0);ctx.rotate(ang);
     ctx.beginPath();
     if(f.shape==='circle'){ctx.arc(0,0,(f.r||100)*SC,0,7);if(f.ring){ctx.arc(0,0,Math.max(0,(f.r-f.ring))*SC,0,7,true);}}
     else if(f.shape==='cone'){const s=(f.spread||1.6)/2;ctx.moveTo(0,0);ctx.arc(0,0,(f.len||200)*SC,-Math.PI/2-s,-Math.PI/2+s);ctx.closePath();}
@@ -91,10 +98,16 @@ function draw(ctx,item,now){
   const [px,py]=P(me.x,me.y);
   if(spec.move&&spec.move.kind==='blink'&&t>=0&&t<350){const [ox,oy]=P(0,0);ctx.strokeStyle='rgba(160,220,255,'+(1-t/350)+')';ctx.setLineDash([3,3]);ctx.beginPath();ctx.moveTo(ox,oy);ctx.lineTo(px,py);ctx.stroke();ctx.setLineDash([]);}
   const active=(arr)=>arr&&t>=0&&t<arr[1];
-  let spin=1,len=1;if(active(spec.spin))spin=spec.spin[0];if(active(spec.length))len=spec.length[0];
-  item._a=(item._a||0)+.06*spin;const phase=spec.phase&&t>=0&&t<spec.phase;
+  let len=1;if(active(spec.length))len=spec.length[0];
+  item._a=spec.classicReverse||spec.afterSpin?(t<0?t/1000*Math.PI:-Math.min(t,300)/300*Math.PI*2-Math.max(0,t-300)/1000*Math.PI):Math.PI/1000*(t<0?t:spec.spin?Math.min(t,spec.spin[1])*spec.spin[0]+Math.max(0,t-spec.spin[1]):t);const phase=spec.phase&&t>=0&&t<spec.phase;
   ctx.globalAlpha=phase?.45:1;
   const swordCol=spec.fire&&t>=0&&t<2500?'#ff9a3c':item.fx?'#e9eef7':accent;
+  if(spec.afterSpin){
+    ctx.save();ctx.translate(px,py);ctx.scale(SC,SC);
+    reverseAfterimage.draw(ctx,t-300,0,1,170,(c,r)=>{
+      c.strokeStyle='#b6fff0';c.lineWidth=12;c.beginPath();c.moveTo(0,-r+100);c.lineTo(0,-r);c.stroke();
+    },reduce);ctx.restore();
+  }
   drawSword(ctx,px,py,item._a,len,swordCol);
   if(spec.twin&&t>=0&&t<3000)drawSword(ctx,px,py,item._a+Math.PI,1,'#bcd');
   ctx.fillStyle='#ffd27a';ctx.beginPath();ctx.arc(px,py,25*SC,0,7);ctx.fill();ctx.globalAlpha=1;
@@ -111,7 +124,7 @@ function drawAux(ctx,f,t,P,me,accent){
   if(t<0)return;const ms=f.ms||(f.ticks?f.ticks*1000:1500);if(t>Math.min(ms,3000)&&!['heal','cost'].includes(f.t))return;
   const [x,y]=P(me.x,me.y);ctx.save();
   const ring=(r,col,dash)=>{ctx.strokeStyle=col;ctx.lineWidth=2;if(dash)ctx.setLineDash(dash);ctx.beginPath();ctx.arc(x,y,r,0,7);ctx.stroke();ctx.setLineDash([]);};
-  const k=(Date.now()%900)/900;
+  const k=(t%900)/900;
   switch(f.t){
     case 'shield':ring(11,'rgba(120,190,255,.95)');ctx.fillStyle='rgba(120,190,255,.18)';ctx.beginPath();ctx.arc(x,y,11,0,7);ctx.fill();break;
     case 'guard':case 'parry':case 'record':case 'undying':case 'anchor':ring(10,f.t==='parry'?'#fff2a8':f.t==='undying'?'#ff9b9b':'#f2c14e',f.t==='anchor'?[3,2]:null);break;
@@ -119,9 +132,10 @@ function drawAux(ctx,f,t,P,me,accent){
     case 'cost':if(t<700){ctx.fillStyle='rgba(230,60,80,'+(1-t/700)+')';ctx.font='bold 12px sans-serif';ctx.fillText('−',x+8,y-4-t/50);}break;
     case 'buff':ring(9+k*4,'rgba(255,110,90,'+(1-k)+')');break;
     case 'shots':ring((f.r||120)*.24,'rgba(180,220,255,.7)',[2,3]);break;
-    case 'sanctum':case 'banner':{ctx.fillStyle=f.t==='banner'?'rgba(255,200,90,.15)':'rgba(140,240,170,.15)';ctx.beginPath();ctx.arc(x,y,(f.r||160)*.24,0,7);ctx.fill();break;}
-    case 'wall':{const [wx,wy]=P(me.x,me.y-120);ctx.strokeStyle='#cfd8e6';ctx.lineWidth=4;ctx.beginPath();ctx.moveTo(wx-(f.len||220)*.12,wy);ctx.lineTo(wx+(f.len||220)*.12,wy);ctx.stroke();break;}
-    case 'decoy':{const [dx,dy]=P(me.x,me.y-160);ctx.globalAlpha=.55;ctx.fillStyle='#ffd27a';ctx.beginPath();ctx.arc(dx,dy,6,0,7);ctx.fill();break;}
+    case 'sanctum':case 'banner':{ctx.translate(x,y);ctx.scale(SC,SC);
+      skillZoneFx.draw(ctx,{skill:f.t==='banner'?'warBanner':'sanctuary',kind:'circle',r:f.r||160,age:t,armIn:-t,left:ms-t},{reduced:reduce,tint:'140,220,150'});break;}
+    case 'wall':{const [wx,wy]=P(me.x,me.y-(f.off||120));ctx.translate(wx-(f.len||220)*SC/2,wy);ctx.scale(SC,SC);skillZoneFx.wall(ctx,f.len||220,30,ms-t,reduce);break;}
+    case 'decoy':{ctx.globalAlpha=.55;ctx.fillStyle='#8fd0ff';ctx.beginPath();ctx.arc(x,y,6,0,7);ctx.fill();drawSword(ctx,x,y,Math.PI/4,.8,'#b6eaff');break;}
     case 'trail':{ctx.fillStyle='rgba(200,230,255,.25)';ctx.fillRect(x-3,y,6,40);break;}
     case 'beat':ring(8+k*6,'rgba(255,255,255,'+(1-k)+')');break;
   }

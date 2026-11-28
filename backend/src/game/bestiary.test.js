@@ -55,7 +55,8 @@ test('lancer telegraphs a locked line, and only the armed hazard deals damage',(
   assert.equal(a.step([p],1300).length,0,'no damage during the warning');
   const hits=a.step([p],1050+470);
   assert.ok(hits.some(d=>d.source==='lancer:hazard'));
-  assert.ok(a.projectiles.some(s=>s.kind==='spear'),'spear projectile fires on thrust');
+  assert.equal(e.phase,'active');
+  assert.ok(a.snapshot(1050+520).find(o=>o.id===e.id).spearExt>0,'spear extends during thrust');
 });
 test('sickler telegraphs with a bar, pierces players, and returns faster',()=>{
   const a=quiet(),p=player();

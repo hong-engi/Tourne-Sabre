@@ -135,7 +135,13 @@ const methods={
   // Hooks for the original abilities' exclusive augments and the combos.
   castHooks(ctx,skill,spec){
     const {mod,sk,now}=ctx,own=mod.own,f=(o)=>this.addZone(ctx,skill,o);
-    if (skill==='reverse'&&own.xQ01) f({shape:'circle',at:'self',follow:true,r:170,delay:300,power:.8,tag:'afterSpin'});
+    if (skill==='reverse'&&own.xQ01) {
+      const z=f({shape:'circle',at:'self',follow:true,r:170,delay:300,last:300,power:.8,tag:'afterSpin'});
+      // The report is sent before the real blade reverses. The echo keeps
+      // that original direction and starts from the completed turn's angle.
+      z.spinDirection=ctx.burst.spinDirection===-1?-1:1;
+      z.bladeAngle=Number.isFinite(ctx.burst.bladeAngle)?ctx.burst.bladeAngle:ctx.player.sw_angle||0;
+    }
     if (skill==='dash'&&own.xE02) f({shape:'circle',at:'point',off:230*mod.momentum,r:130,delay:260,power:1,status:{slow:[.6,1000]}});
     if (skill==='blink'&&own.xD01) f({shape:'circle',at:'origin',r:60,ticks:5,every:200,once:true,power:1,last:1000,tag:'fold'});
     if (skill==='exhaust'&&own.xF03) {

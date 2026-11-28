@@ -6,7 +6,7 @@ const {separateBodies}=require('../../../frontend/src/bodyPhysics');
 // Both sides are thrown apart on contact so bodies do not stay glued together:
 // the player slides about KNOCKBACK/2 units, the enemy about PUSHBACK/5 units
 // and then stays staggered briefly before it walks back in.
-const CONTACT_KNOCKBACK=260,CHARGE_KNOCKBACK=420,ENEMY_PUSHBACK=480,ENEMY_STAGGER=400;
+const CONTACT_KNOCKBACK=260,CHARGE_KNOCKBACK=760,ENEMY_PUSHBACK=480,ENEMY_STAGGER=400;
 const CHARGE_DAMAGE=24;
 function playerEnemy(c){
   if(c.a.kind===c.b.kind)return null;
@@ -38,15 +38,23 @@ class CollisionWorld{
     for(const c of contacts){
       const hit=playerEnemy(c);
       if(!hit||hit.player.source.choosingAugment)continue;
-      const {player,enemy,nx,ny}=hit,charging=enemy.source.phase==='charge';
-      events.push({id:player.id,sourceId:enemy.id,amount:charging?Math.round(CHARGE_DAMAGE*(enemy.source.power||1)):enemy.source.contact??13});
+      const {player,enemy,nx,ny}=hit,charging=enemy.source.phase==='charge',lunging=enemy.source.type==='leech'&&enemy.source.phase==='lunge';
+      const contactDmg=charging?Math.round(CHARGE_DAMAGE*(enemy.source.power||1)):lunging?Math.round(12*(enemy.source.power||1)):enemy.source.contact??13;
+      events.push({id:player.id,sourceId:enemy.id,amount:contactDmg});
       if(now<(this.cooldowns.get(c.pair)||0))continue;
       this.cooldowns.set(c.pair,now+600);
-      const knock=charging?CHARGE_KNOCKBACK:CONTACT_KNOCKBACK;
-      corrections.push({id:player.id,dx:0,dy:0,dvx:-nx*knock,dvy:-ny*knock});
-      if(!charging){
-        enemy.source.pushVx=(enemy.source.pushVx||0)+nx*ENEMY_PUSHBACK;
-        enemy.source.pushVy=(enemy.source.pushVy||0)+ny*ENEMY_PUSHBACK;
+      const mass=lunging?2.0:(enemy.mass||1);
+      let kx=-nx,ky=-ny;
+      if((charging||lunging)&&Number.isFinite(enemy.source.aimX)&&Number.isFinite(enemy.source.aimY)){
+        const bx=-nx*.45+enemy.source.aimX,by=-ny*.45+enemy.source.aimY,bl=Math.hypot(bx,by);
+        if(bl>1e-5){kx=bx/bl;ky=by/bl;}
+      }
+      const knock=charging?CHARGE_KNOCKBACK:lunging?460:CONTACT_KNOCKBACK*Math.min(1.6,Math.max(.65,Math.sqrt(mass)));
+      corrections.push({id:player.id,dx:0,dy:0,dvx:kx*knock,dvy:ky*knock});
+      if(!charging&&!enemy.source.fixed){
+        const push=ENEMY_PUSHBACK/Math.max(.6,mass);
+        enemy.source.pushVx=(enemy.source.pushVx||0)+nx*push;
+        enemy.source.pushVy=(enemy.source.pushVy||0)+ny*push;
         enemy.source.staggerUntil=now+ENEMY_STAGGER;
       }
     }

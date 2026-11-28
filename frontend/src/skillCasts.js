@@ -120,7 +120,7 @@ export function castClassic(player,id,now,from){
   if(player.stationary)return;
   const own=modifiers(player.augments).own;
   if(!CAST_HOOKS.some(k=>own[k]))return;
-  pushBurst(player,'cast',id,{},from);
+  pushBurst(player,'cast',id,id==='reverse'?{bladeAngle:player.sw_angle,spinDirection:player.skills.direction}:{},from);
 }
 export function recallTurret(player,now){
   const s=player.skills,mod=modifiers(player.augments);

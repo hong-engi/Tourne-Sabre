@@ -1,0 +1,1 @@
+Top-down pixel art game object sprite: a short rough mud pillar. One isolated centered object, dark navy #101823 outline, simple readable silhouette for 40 pixels, restrained medieval fantasy palette, transparent background, no text, no ground shadow.
