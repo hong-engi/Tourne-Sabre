@@ -76,11 +76,11 @@ class MapState {
     this.enemyMotion=new MotionBuffer(60);this.playerMotion=new MotionBuffer();
     this.enemyPending=false;this.nextEnemy=0;this.nextItems=0;
     this.projectiles={list:[],at:0};this.threat={level:1,elapsed:0};this.seenBlasts=new Set();this.hazards={list:[],at:0};this.skillZones={list:[],walls:[],decoys:[],at:0};
-    this.socket=null;this.activePlayer=null;
+    this.socket=null;this.activePlayer=null;this.warnClock=new Map();
   }
   reset(){
     this.nextSync=0;this.nextAttack=0;this.enemyList=[];this.enemyMotion.clear();this.playerMotion.clear();this.nextEnemy=0;this.nextItems=0;
-    this.projectiles={list:[],at:0};this.threat={level:1,elapsed:0};this.seenBlasts.clear();this.hazards={list:[],at:0};this.skillZones={list:[],walls:[],decoys:[],at:0};
+    this.projectiles={list:[],at:0};this.threat={level:1,elapsed:0};this.seenBlasts.clear();this.warnClock.clear();this.hazards={list:[],at:0};this.skillZones={list:[],walls:[],decoys:[],at:0};
     this.attackPending=false;this.syncPending=false;this.enemyPending=false;
   }
   setActivePlayer(player){
@@ -108,6 +108,7 @@ class MapState {
     if(!data)return;
     const payload=Array.isArray(data)?{enemies:data}:data;
     this.enemyList=payload.enemies||[];
+    this.stampWarnings(this.enemyList,at);
     this.enemyMotion.push(this.enemyList,at);
     if(Array.isArray(payload.players)){
       this.playerList=payload.players;
@@ -130,6 +131,21 @@ class MapState {
       this.seenBlasts.add(blast.id);this.onBlast?.(blast);
     }
     if(this.seenBlasts.size>200)this.seenBlasts=new Set([...this.seenBlasts].slice(-50));
+  }
+  // Attack warnings run on the client's own clock: the first snapshot of a
+  // windup fixes when it ends, so the gauge fills smoothly even if later
+  // snapshots arrive late or are dropped. Re-anchor only on a real change
+  // (new windup, or the room paused and the end moved).
+  stampWarnings(rows,at){
+    const live=new Set();
+    for(const e of rows){
+      if(!Number.isFinite(e.phaseLeft))continue;
+      live.add(e.id);
+      const end=at+e.phaseLeft,c=this.warnClock.get(e.id);
+      if(!c||c.phase!==e.phase||c.total!==e.phaseTotal||Math.abs(c.endAt-end)>150)this.warnClock.set(e.id,{phase:e.phase,total:e.phaseTotal,endAt:end});
+      e.phaseEndAt=this.warnClock.get(e.id).endAt;
+    }
+    for(const id of this.warnClock.keys())if(!live.has(id))this.warnClock.delete(id);
   }
   attachSocket(socket){
     if(this.socket===socket)return;

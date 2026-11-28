@@ -145,3 +145,24 @@ test('runtime handleAttack applies heal/shield outcomes directly in memory and r
   assert.equal(p.shield, 20);
   assert.ok(result.record && result.record.shield === 20);
 });
+
+test('attack windups carry remaining and total time for the client countdown', () => {
+  const { EnemyArena } = require('./enemies');
+  const a = new EnemyArena(() => 0.37);
+  const p = { _id: 'p', x: 0, y: 0, hp: 1e6, hpmax: 1e6, lv: 5, augments: [], r: 25 };
+  a.step([p], 1000);
+  a.enemies = [];
+  a.nextSpawn = Infinity;
+  const e = a.spawn(p, 'charger', 1000, { x: 200, y: 0 });
+  const seen = [];
+  for (let t = 1050; t < 8000 && seen.length < 3; t += 50) {
+    a.nextSpawn = Infinity;
+    a.step([p], t);
+    const row = a.snapshot(t).find(r => r.id === e.id);
+    if (row && row.phase === 'windup') seen.push(row);
+    else assert.equal(row && row.phaseLeft, undefined, 'no countdown outside a warning');
+  }
+  assert.equal(seen.length, 3, 'charger winds up');
+  assert.ok(seen.every(r => r.phaseTotal === seen[0].phaseTotal), 'total stays fixed through the windup');
+  assert.ok(seen[0].phaseLeft > seen[1].phaseLeft && seen[1].phaseLeft > seen[2].phaseLeft, 'remaining time counts down');
+});

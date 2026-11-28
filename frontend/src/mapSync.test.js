@@ -103,3 +103,28 @@ test('MapState streams player:sync and enemy:attack over WebSocket and preserves
   expect(p.hp).toBe(108);
   expect(p.shield).toBe(20);
 });
+
+describe('attack warning countdown', () => {
+  const {map}=require('./map');
+  const {warnProgress}=require('./mapdraw');
+  test('runs on the client clock and survives late snapshots', () => {
+    map.warnClock.clear();
+    const rows=[{id:'e1',phase:'windup',phaseLeft:600,phaseTotal:800}];
+    map.stampWarnings(rows,1000);
+    expect(rows[0].phaseEndAt).toBe(1600);
+    expect(warnProgress(rows[0],1000)).toBeCloseTo(.25);
+    // A snapshot that arrives 40ms late keeps the first anchor.
+    const late=[{id:'e1',phase:'windup',phaseLeft:550,phaseTotal:800}];
+    map.stampWarnings(late,1090);
+    expect(late[0].phaseEndAt).toBe(1600);
+    expect(warnProgress(late[0],1400)).toBeCloseTo(.75);
+    expect(warnProgress(late[0],2000)).toBe(1);
+    // A new windup re-anchors; enemies without one are forgotten.
+    const fresh=[{id:'e1',phase:'aim',phaseLeft:500,phaseTotal:500}];
+    map.stampWarnings(fresh,3000);
+    expect(fresh[0].phaseEndAt).toBe(3500);
+    map.stampWarnings([{id:'e1',phase:'hunt'}],3600);
+    expect(map.warnClock.size).toBe(0);
+    expect(warnProgress({phase:'hunt'},0)).toBe(null);
+  });
+});

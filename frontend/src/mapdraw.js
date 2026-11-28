@@ -565,6 +565,25 @@ function bossBar(ctx,size){
   ctx.fillText(ENEMY_NAMES[boss.type]||boss.type,size.width/2,y-8);ctx.restore();
 }
 function enemyPose(enemy) {return enemy;}
+// Countdown ring for an attack windup: fills clockwise and turns pale just
+// before the hit. The bomber keeps its own blast-radius timer.
+export function warnProgress(e,time){
+  if(!(e.phaseTotal>0))return null;
+  const left=Number.isFinite(e.phaseEndAt)?e.phaseEndAt-time:e.phaseLeft;
+  if(!Number.isFinite(left))return null;
+  return 1-Math.max(0,Math.min(1,left/e.phaseTotal));
+}
+function drawWarnGauge(ctx,e,time){
+  if(e.type==='bomber')return;
+  const progress=warnProgress(e,time);
+  if(progress===null)return;
+  const r=e.r+9;
+  ctx.save();ctx.lineCap='round';ctx.lineWidth=3;
+  ctx.strokeStyle='#ffc3a133';ctx.beginPath();ctx.arc(0,0,r,0,TAU);ctx.stroke();
+  ctx.strokeStyle=progress>.75?'#fff2c6':'#ff945e';
+  ctx.beginPath();ctx.arc(0,0,r,-Math.PI/2,-Math.PI/2+TAU*progress);ctx.stroke();
+  ctx.restore();
+}
 function drawEnemy(ctx, raw, me, size, time, reduced) {
   const e = enemyPose(raw, time);
   const x = size.width/2 + e.x - me.pos.x, y = size.height/2 + e.y - me.pos.y;
@@ -735,6 +754,7 @@ function drawEnemy(ctx, raw, me, size, time, reduced) {
   const drawn=e.r*(SPRITE_SCALE[art]||1);
   sprite(ctx,sprites[art] ? art : 'enemy',-drawn,-drawn,drawn*2,drawn*2); ctx.restore();ctx.globalAlpha=1;
   if (['windup','fuse','signal','pull','record','mend','reverse','waveWindup','slamWindup','dashWindup'].includes(e.phase)) {ctx.fillStyle = '#ffc3a1'; ctx.font = 'bold 18px monospace'; ctx.textAlign='center'; ctx.fillText('!',0,-e.r-9);}
+  drawWarnGauge(ctx,e,time);
   if (e.type==='decoy'&&e.revealed) {ctx.fillStyle='#c9b6f0';ctx.font='bold 15px monospace';ctx.textAlign='center';ctx.fillText('?',0,-e.r-8);}
   // Vulnerable windows read the same everywhere: a gold ring (lantern uses a closed shield instead).
   if(e.type!=='lantern'&&(e.armor>1||e.phase==='core'))circle(ctx,0,0,e.r+5,null,'#ffd88a99',2);

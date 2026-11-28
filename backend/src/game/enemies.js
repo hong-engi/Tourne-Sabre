@@ -143,6 +143,22 @@ const SERVER_ONLY=new Set(['name','path','leapFromX','leapFromY','phaseUntil','n
   'nextSpecial','expireAt','launchPillarId','launchAngle','arriveAt','arriveX','arriveY','callCount','offsetSide','baseSpeedScale','stakeSide',
   'regrowAt','chainTurn','swapPending','orbTurn','brewing','brewDamage','planted','exposedUntil','summonerId','heat','sparkAt','featherAt',
   'gliding','attach','clawing','runEndX','runEndY','running']);
+// Attack warnings carry their remaining and total time so the client can run
+// the countdown gauge on its own clock.
+const WARN_PHASES=new Set(['windup','fuse','signal','pull','record','mend','reverse','waveWindup','slamWindup','dashWindup','aim']);
+const warnWindows=new WeakMap();
+function warnWindow(e,now) {
+  if (!WARN_PHASES.has(e.phase)||!(e.phaseUntil>now)) {warnWindows.delete(e);return null;}
+  const left=e.phaseUntil-now,seen=warnWindows.get(e);
+  if (seen&&seen.phase===e.phase&&left<=seen.left+60) {
+    // Same window: a room pause pushed phaseUntil later, so grow the total with it.
+    seen.total+=e.phaseUntil-seen.until;seen.until=e.phaseUntil;seen.left=left;
+    return seen;
+  }
+  const fresh={phase:e.phase,until:e.phaseUntil,left,total:left};
+  warnWindows.set(e,fresh);
+  return fresh;
+}
 // Two decimals are plenty on screen and halve the size of every float.
 const wire=v=>typeof v==='number'&&!Number.isInteger(v)?Math.round(v*100)/100:v;
 class EnemyArena {
@@ -972,6 +988,8 @@ class EnemyArena {
     // false/null read the same as missing on the client, so they are not sent.
     for (const k in e) if (!SERVER_ONLY.has(k)&&e[k]!==false&&e[k]!=null) row[k]=wire(e[k]);
     if (e.phase!=='charge') {delete row.chargeEndX;delete row.chargeEndY;}
+    const warn=warnWindow(e,now);
+    if (warn) {row.phaseLeft=Math.round(warn.left);row.phaseTotal=Math.max(1,Math.round(warn.total));}
     if ((e.type==='splitter'||e.type==='mite')&&e.nextHop) {
       const interval=e.type==='splitter'?SPLITTER_HOP_MS:MITE_HOP_MS;
       row.hopProgress=Math.max(0,Math.min(1,(now-e.nextHop+interval)/Math.min(420,interval)));
