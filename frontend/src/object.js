@@ -82,6 +82,12 @@ class Player{
         this.hpmax = 100;
         this.augments = [];
         this.physicsAck={seq:0,x:0,y:0,vx:0,vy:0};
+        this.mode = 'pve';
+        this.stealthUntil = 0;
+        this.stealthOrigin = null;
+        this.pveCooldownUntil = 0;
+        this.pveFreeUntil = 0;
+        this.bossBuffUntil = 0;
      
         this.color = getRandomColor();
     }

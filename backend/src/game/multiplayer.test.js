@@ -13,22 +13,46 @@ try {
   ioClient = null;
 }
 
-const join = id => ({ id, name: id, pos: { x: 0, y: 0 }, speed: { x: 0, y: 0 }, hp: 100, hpmax: 100, xp: 0, lv: 1 });
+const join = (id, mode = 'pve') => ({ id, name: id, mode, pos: { x: 0, y: 0 }, speed: { x: 0, y: 0 }, hp: 100, hpmax: 100, xp: 0, lv: 1 });
 const sync = (id, open) => ({ id, pos: { x: 0, y: 0 }, speed: { x: 0, y: 0 }, xp: 0, augmentMenuOpen: open });
 
 beforeEach(() => {
   playerdb.clear();
   progression.clearTimers();
-  runtime.arena.enemies = [];
+  runtime.reset();
 });
 
-test('the augment picker pauses a solo run but not a shared (PvP) arena', () => {
-  playerdb.addSync(join('a'));
-  assert.equal(progression.syncSync(sync('a', true)).choosingAugment, true, 'solo: paused');
-  playerdb.addSync(join('b'));
-  assert.equal(progression.syncSync(sync('a', true)).choosingAugment, false, 'another player: no pause');
-  playerdb.get('b').hp = 0;
-  assert.equal(progression.syncSync(sync('a', true)).choosingAugment, true, 'dead players do not count');
+test('the augment picker pauses solo PvE but never PvP', () => {
+  playerdb.addSync(join('a', 'pve'));
+  assert.equal(progression.syncSync(sync('a', true)).choosingAugment, true, 'solo PvE: paused');
+  playerdb.addSync(join('b', 'pvp'));
+  assert.equal(progression.syncSync(sync('b', true)).choosingAugment, false, 'PvP: never pauses');
+  assert.throws(() => progression.chooseSync('b', 'vitality'), /PvP/);
+});
+
+test('mode switching: PvE->PvP anytime with 5s stealth + 5m cooldown, PvP->PvE unlocked by boss kill', () => {
+  const p = playerdb.addSync(join('m1', 'pve'));
+  runtime.initPlayerMode(p, 'pve', 1000);
+  assert.equal(p.mode, 'pve');
+
+  runtime.switchMode('m1', 'pvp', 2000);
+  assert.equal(p.mode, 'pvp');
+  assert.equal(p.stealthUntil, 7000);
+  assert.equal(p.pveCooldownUntil, 302000);
+  assert.throws(() => runtime.switchMode('m1', 'pve', 10000), /대기 중/);
+
+  // Boss last-hit grants 50% missing HP heal, 10s shield, 30s buff, and 30s free PvE switch.
+  p.hp = 40;
+  progression.applyBossKillReward('m1', 10000);
+  assert.equal(p.hp, 70);
+  assert.equal(p.shield, 50);
+  assert.equal(p.shieldUntil, 20000);
+  assert.equal(p.bossBuffUntil, 40000);
+  assert.equal(p.pveFreeUntil, 40000);
+
+  runtime.switchMode('m1', 'pve', 15000);
+  assert.equal(p.mode, 'pve');
+  assert.equal(p.stealthUntil, 0);
 });
 
 function listen(options) {

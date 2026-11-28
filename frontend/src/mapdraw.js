@@ -410,8 +410,21 @@ function actor(ctx, p, own, x, y, time, reduced) {
   const width = own ? height * .75 : height * .8125;
   ctx.fillStyle = '#07101899'; ctx.fillRect(-width / 2 + 3, height / 2 - 3, width - 6, 9);
   const flashed = !reduced && effects.some(fx => ['impact','hurt','kill'].includes(fx.type) && time-fx.born<150 && (fx.targetId===p.id || Math.hypot(fx.x-p.pos.x,fx.y-p.pos.y)<p.r));
+  const sNow=map.serverNow?map.serverNow():Date.now();
+  const stealthed=own&&(p.stealthUntil||0)>sNow;
+  const bossBuff=own?(p.bossBuffUntil||0)>sNow:!!p.bossBuff;
   const ghost=own&&p.combatState?.ghost;
-  if(ghost){circle(ctx,0,0,p.r+8,'#7fe3ff22','#9eeaffaa',1.5);ctx.globalAlpha=.5;}
+  if(stealthed){
+    ctx.save();
+    ctx.setLineDash([5,4]);
+    circle(ctx,0,0,p.r+11,'#6ee7ff18','#7eeeffcc',2);
+    ctx.restore();
+    ctx.globalAlpha*=.42;
+  } else if(ghost){circle(ctx,0,0,p.r+8,'#7fe3ff22','#9eeaffaa',1.5);ctx.globalAlpha=.5;}
+  if(bossBuff){
+    const pulse=reduced?0:Math.sin(time/160)*2;
+    circle(ctx,0,0,p.r+14+pulse,'#ffd87a12','#ffd87acc',2);
+  }
   if(flashed)ctx.filter='brightness(2.8) saturate(.3)';
   const flipThresh=own?.5:25;
   let faceLeft=actorFacing.get(p.id)||false;
@@ -423,12 +436,18 @@ function actor(ctx, p, own, x, y, time, reduced) {
     ctx.save(); ctx.scale(-1, 1); sprite(ctx, own ? 'knight' : 'enemy', -width / 2, -height / 2 - step, width, height); ctx.restore();
   } else sprite(ctx, own ? 'knight' : 'enemy', -width / 2, -height / 2 - step, width, height);
   if(flashed)ctx.filter='none';
-  if(ghost)ctx.globalAlpha=1;
+  if(stealthed||ghost)ctx.globalAlpha=1;
   if(p.shield>0)circle(ctx,0,0,p.r+12,null,'#a4c9f0aa',2);
   // Ignite: the player's blades burn.
-  if(own&&p.combatState?.ignite&&!reduced){ctx.shadowColor='#ff7a2a';ctx.shadowBlur=14+4*Math.sin(time/70);}
-  if(own){dashArc(ctx,p);extraBlades(ctx,p,time,reduced);}
-  if(!own){ctx.save();ctx.filter='sepia(.9) saturate(3.5) hue-rotate(-38deg) brightness(.95)';blade(ctx, p, time, reduced);ctx.restore();}
+  if(own&&!stealthed&&p.combatState?.ignite&&!reduced){ctx.shadowColor='#ff7a2a';ctx.shadowBlur=14+4*Math.sin(time/70);}
+  if(own&&!stealthed){dashArc(ctx,p);extraBlades(ctx,p,time,reduced);}
+  if(stealthed){
+    ctx.save();ctx.globalAlpha*=.25;blade(ctx,p,time,reduced);ctx.restore();
+    const leftSec=((p.stealthUntil-sNow)/1000).toFixed(1);
+    ctx.font='bold 11px monospace, sans-serif';ctx.fillStyle='#9ff3ff';ctx.textAlign='center';
+    ctx.fillText(`은신 ${leftSec}s`,0,-height/2-12);
+  }
+  else if(!own){ctx.save();ctx.filter='sepia(.9) saturate(3.5) hue-rotate(-38deg) brightness(.95)';blade(ctx, p, time, reduced);ctx.restore();}
   else blade(ctx, p, time, reduced);
   ctx.shadowBlur=0;
   const health = Math.max(0, Math.min(1, p.hp / p.hpmax));
@@ -1115,6 +1134,21 @@ function drawWorld(ctx, me, size, time, reduced) {
       const pos=fx.targetId===me.id?me.pos:fx;
       drawLevelUpAura(ctx,width/2+pos.x-camera.x,height/2+pos.y-camera.y,Math.max(0,time-fx.born),reduced,fx.seed);
     });
+    const sNow=map.serverNow?map.serverNow():Date.now();
+    if((me.stealthUntil||0)>sNow&&me.stealthOrigin){
+      const ox=width/2+me.stealthOrigin.x-camera.x,oy=height/2+me.stealthOrigin.y-camera.y;
+      ctx.save();
+      ctx.setLineDash([4,4]);
+      ctx.strokeStyle='#7eeeff88';ctx.lineWidth=1.5;
+      ctx.beginPath();ctx.moveTo(ox,oy);ctx.lineTo(width/2,height/2);ctx.stroke();
+      const pulse=reduced?0:Math.sin(time/180)*3;
+      circle(ctx,ox,oy,18+pulse,'#7eeeff14','#7eeeffaa',1.5);
+      ctx.setLineDash([]);
+      ctx.beginPath();ctx.moveTo(ox-8,oy);ctx.lineTo(ox+8,oy);ctx.moveTo(ox,oy-8);ctx.lineTo(ox,oy+8);ctx.stroke();
+      ctx.font='bold 10px monospace, sans-serif';ctx.fillStyle='#9ff3ff';ctx.textAlign='center';
+      ctx.fillText('시작 위치',ox,oy-24);
+      ctx.restore();
+    }
     actor(ctx, me, true, width / 2, height / 2, time, reduced);
     feedback(ctx, camera, width, height, time, reduced);
     trails.forEach((trail,id)=>{if(time-trail.seen>1000)trails.delete(id);});

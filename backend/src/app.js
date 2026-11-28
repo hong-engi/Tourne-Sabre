@@ -86,16 +86,45 @@ function createServer({ reconnectGraceMs = RECONNECT_GRACE_MS } = {}) {
 
     socket.on('player:join', (payload, ack) => {
       try {
+        const now = Date.now();
         const id = payload && String(payload.id ?? payload._id);
         keep(id);
         const existing = payload && payload.rejoin ? playerdb.get(id) : null;
         const record = existing || playerdb.addSync(payload);
         socket.data.pid = record._id;
-        if (!existing) playLog.start(record);
-        const players = playerdb.list().map(progression.playerPublic);
-        const items = itemdb.list();
+        if (!existing) {
+          const requestedMode = payload && payload.mode === 'pvp' ? 'pvp' : 'pve';
+          runtime.initPlayerMode(record, requestedMode, now);
+          playLog.start(record);
+        } else if (record.mode === 'pve') {
+          runtime.arenaFor(record._id);
+        }
+        const players = record.mode === 'pve'
+          ? [progression.playerPublic(record, now)]
+          : playerdb.list()
+            .filter(p => p.mode === 'pvp' && (!progression.isStealthed(p, now) || p._id === record._id))
+            .map(p => progression.playerPublic(p, now));
         if (typeof ack === 'function') {
-          ack({ ok: true, player: progression.playerRecord(record), players, items });
+          ack({ ok: true, player: progression.playerRecord(record), players, serverTime: now });
+        }
+      } catch (err) {
+        if (typeof ack === 'function') ack({ ok: false, error: err.message });
+      }
+    });
+
+    socket.on('mode:switch', (payload, ack) => {
+      try {
+        const now = Date.now();
+        const id = (payload && payload.id) || socket.data.pid;
+        const row = runtime.switchMode(id, payload && payload.mode, now);
+        socket.data.lastMe = null;
+        if (typeof ack === 'function') {
+          ack({
+            ok: true,
+            player: progression.playerRecord(row),
+            pos: { x: row.x, y: row.y },
+            serverTime: now,
+          });
         }
       } catch (err) {
         if (typeof ack === 'function') ack({ ok: false, error: err.message });
@@ -133,6 +162,8 @@ function createServer({ reconnectGraceMs = RECONNECT_GRACE_MS } = {}) {
 
     socket.on('item:ate', payload => {
       if (!payload) return;
+      const picker = payload.playerId && playerdb.get(payload.playerId);
+      if (progression.isStealthed(picker, Date.now())) return;
       // Broadcast to other clients; the picker already applied it optimistically.
       const row = itemdb.updateSync(payload, { notify: false });
       socket.broadcast.emit('items:patch', [row]);
@@ -145,14 +176,22 @@ function createServer({ reconnectGraceMs = RECONNECT_GRACE_MS } = {}) {
 
     socket.on('player:damage', payload => {
       if (!payload || !payload.id) return;
-      const change = progression.damageSync(payload.id, payload.dmg);
-      if (change) playLog.damage(payload.id, { source: 'pvp', raw: Number(payload.dmg) || 0, ...change });
+      const now = Date.now();
+      const target = playerdb.get(payload.id);
+      const attacker = socket.data && socket.data.pid ? playerdb.get(socket.data.pid) : null;
+      if (!target || target.mode !== 'pvp' || progression.isStealthed(target, now)) return;
+      if (attacker && (attacker.mode !== 'pvp' || progression.isStealthed(attacker, now))) return;
+      const buffScale = attacker && (attacker.bossBuffUntil || 0) > now ? 1.25 : 1;
+      const raw = (Number(payload.dmg) || 0) * buffScale;
+      const change = progression.damageSync(payload.id, raw, now);
+      if (change) playLog.damage(payload.id, { source: 'pvp', raw, ...change });
     });
 
     socket.on('player:kill', payload => {
       const id = payload && (payload.id || payload);
       if (!id) return;
       playLog.end(id, 'kill');
+      runtime.removePveArena(id);
       playerdb.removeSync(id);
       if (socket.data.pid === String(id)) socket.data.pid = null;
     });
@@ -161,7 +200,7 @@ function createServer({ reconnectGraceMs = RECONNECT_GRACE_MS } = {}) {
       try {
         const id = payload && payload.id;
         const spell = payload && payload.spell;
-        const row = progression.castSpellSync(id, spell, runtime.arena);
+        const row = progression.castSpellSync(id, spell, runtime.arenaFor(id));
         playLog.spell(id, spell);
         if (typeof ack === 'function') ack({ ok: true, row: progression.playerRecord(row) });
       } catch (err) {
@@ -196,6 +235,7 @@ function createServer({ reconnectGraceMs = RECONNECT_GRACE_MS } = {}) {
         leaving.delete(pid);
         if (claimed(pid, socket) || !playerdb.get(pid)) return;
         playLog.end(pid, 'disconnect');
+        runtime.removePveArena(pid);
         playerdb.removeSync(pid);
       };
       if (!(reconnectGraceMs > 0)) return remove();

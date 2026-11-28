@@ -288,4 +288,12 @@ function chargeTelegraph(enemy){
   const dx=enemy.chargeEndX-enemy.x,dy=enemy.chargeEndY-enemy.y;
   return {length:Math.hypot(dx,dy),angle:Math.atan2(dy,dx),endX:enemy.chargeEndX,endY:enemy.chargeEndY};
 }
-module.exports={specFor:BOOK.specFor,CODES:BOOK.CODES,LATE_LEVEL,MOVERS,CAPS,stackMax,CHARGE,chargeDestination,chargeTelegraph,TREES,TIERS,BASE_ODDS,tierOdds,nextPity,AUGMENTS,SKILLS,DEFAULT_SKILLS,validSkills,SPELLS,DEFAULT_SPELLS,validSpells,kitOf,rollOffer,rerollOffer,rank,levelForXp,xpForLevel,offerCount,canChoose,modifiers,stats,resolveDamage};
+const PVP_STEALTH_MS = 5000;
+const PVP_EXIT_COOLDOWN_MS = 300000;
+const BOSS_BUFF_MS = 30000;
+const BOSS_SHIELD_MS = 10000;
+const BOSS_PVE_FREE_MS = 30000;
+function levelToThreat(lv){
+  return Math.max(1,Math.ceil((Number(lv)||1)/2));
+}
+module.exports={specFor:BOOK.specFor,CODES:BOOK.CODES,LATE_LEVEL,MOVERS,CAPS,stackMax,CHARGE,chargeDestination,chargeTelegraph,PVP_STEALTH_MS,PVP_EXIT_COOLDOWN_MS,BOSS_BUFF_MS,BOSS_SHIELD_MS,BOSS_PVE_FREE_MS,levelToThreat,TREES,TIERS,BASE_ODDS,tierOdds,nextPity,AUGMENTS,SKILLS,DEFAULT_SKILLS,validSkills,SPELLS,DEFAULT_SPELLS,validSpells,kitOf,rollOffer,rerollOffer,rank,levelForXp,xpForLevel,offerCount,canChoose,modifiers,stats,resolveDamage};

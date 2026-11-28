@@ -97,15 +97,30 @@ test('one blade pass hits an enemy once even across several attack requests',()=
   assert.equal(arena.attack({...p,poses:[pose(1.5),pose(3)]},1400).hits.length,0,'blade left');
   assert.equal(arena.attack({...p,poses:[pose(-.9),pose(-.3)]},1600).hits.length,1,'next pass hits again');
 });
-test('threat rises with room time: later spawns are tougher and hit harder',()=>{
-  const {THREAT_STEP_MS}=require('./enemies');
+test('threat rises with player level: higher-level spawns are tougher and hit harder',()=>{
   const arena=new EnemyArena(()=>0),p=player();arena.step([p],1000);
   const early=arena.spawn(p,'stalker',1000);
-  arena.step([p],1000+THREAT_STEP_MS*3);
-  assert.equal(arena.threat(1000+THREAT_STEP_MS*3).level,4);
-  const late=arena.spawn(p,'stalker',1000+THREAT_STEP_MS*3);
+  p.lv=7;
+  arena.step([p],2000);
+  assert.equal(arena.threat(2000).level,4);
+  const late=arena.spawn(p,'stalker',2000);
   assert.ok(late.hpmax>early.hpmax);assert.ok(late.contact>early.contact);assert.ok(late.xp>early.xp);
   arena.step([],2e6);assert.equal(arena.threat(2e6).level,1,'an empty room resets');
+});
+test('pvp mode spawns by nearby max player level, ignores stealthed players, and tracks boss last-hit',()=>{
+  const arena=new EnemyArena(()=>0,{mode:'pvp',nearbyRadius:500});
+  const low={...player(),_id:'low',x:0,y:0,lv:1};
+  const high={...player(),_id:'high',x:120,y:0,lv:9};
+  const hidden={...player(),_id:'ghost',x:0,y:0,lv:20,stealthUntil:5000};
+  arena.step([low,high,hidden],1000);
+  assert.equal(arena.threat(1000).level,5,'stealthed lv20 does not raise threat');
+  assert.ok(arena.enemies.some(e=>e.tier==='boss'),'boss spawns at threat 5 in pvp');
+  assert.equal(arena.attack(hidden,1000).hits.length,0,'stealthed player cannot attack');
+  const boss=arena.enemies.find(e=>e.tier==='boss');
+  boss.x=120;boss.y=-90;boss.hp=1;
+  const res=arena.attack(high,1500);
+  assert.equal(res.bossKill,true);
+  assert.deepEqual(arena.bossKills,['high']);
 });
 test('bomber fuses when close, then explodes on the player and nearby monsters',()=>{
   const arena=new EnemyArena(()=>0),p=player();arena.nextSpawn=Infinity;arena.startedAt=0;

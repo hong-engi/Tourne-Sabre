@@ -14,6 +14,7 @@ jest.mock('./canvas', () => {
     },
     makePlayer: jest.fn(() => Promise.resolve()),
     activateSkill: jest.fn(),
+    switchMode: jest.fn(() => Promise.resolve()),
   };
 });
 
@@ -28,7 +29,7 @@ test('a blank name joins with a random adjective+noun nickname and allows re-ent
   expect(screen.getByLabelText('CHOOSE YOUR NAME')).not.toBeRequired();
   fireEvent.click(enter);
   await waitFor(() => expect(screen.queryByLabelText('CHOOSE YOUR NAME')).not.toBeInTheDocument());
-  expect(makePlayer).toHaveBeenCalledWith('fluffybunny', defaults);
+  expect(makePlayer).toHaveBeenCalledWith('fluffybunny', defaults, 'pve');
   expect(screen.getByRole('region', {name:'전투 스킬'})).toBeInTheDocument();
   fireEvent.click(screen.getByRole('button', {name:'Q 역회전 베기'}));
   expect(activateSkill).toHaveBeenCalledWith('KeyQ');
@@ -40,12 +41,13 @@ test('a blank name joins with a random adjective+noun nickname and allows re-ent
   expect(screen.getByLabelText('CHOOSE YOUR NAME')).toBeInTheDocument();
 });
 
-test('keeps the join form available when the backend rejects entry', async () => {
+test('keeps the join form available when the backend rejects entry and supports selecting PvP mode', async () => {
   makePlayer.mockRejectedValueOnce(new Error('offline'));
   render(<App/>);
+  fireEvent.click(screen.getByRole('button', {name: /PvP 멀티/i}));
   fireEvent.change(screen.getByLabelText('CHOOSE YOUR NAME'), {target: {value: '  Sabre  '}});
   fireEvent.click(screen.getByRole('button', {name: /enter the arena/i}));
-  expect(makePlayer).toHaveBeenCalledWith('Sabre', defaults);
+  expect(makePlayer).toHaveBeenCalledWith('Sabre', defaults, 'pvp');
   expect(await screen.findByRole('alert')).toHaveTextContent('unavailable');
   expect(screen.getByRole('button', {name: /enter the arena/i})).toBeEnabled();
 });

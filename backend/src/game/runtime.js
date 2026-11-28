@@ -2,13 +2,125 @@ const { EnemyArena } = require('./enemies');
 const playerdb = require('../db/playerdb');
 const progression = require('./progression');
 const { playLog } = require('./playLog');
+const rules = require('../../../frontend/src/gameRules');
 
-const arena = new EnemyArena();
+const pvpArena = new EnemyArena(Math.random, { mode: 'pvp' });
+const pveArenas = new Map();
 let timer = null;
 let ioRef = null;
 
 function setIo(io) {
   ioRef = io;
+}
+
+function createPveArena(id) {
+  const key = String(id);
+  const a = new EnemyArena(Math.random, { mode: 'pve' });
+  pveArenas.set(key, a);
+  return a;
+}
+
+function removePveArena(id) {
+  if (id == null) return;
+  pveArenas.delete(String(id));
+}
+
+function arenaFor(id) {
+  const p = id != null ? playerdb.get(id) : null;
+  if (p && p.mode === 'pve') {
+    return pveArenas.get(String(p._id)) || createPveArena(p._id);
+  }
+  return pvpArena;
+}
+
+function initPlayerMode(record, mode, now = Date.now()) {
+  if (!record) return null;
+  const target = mode === 'pvp' ? 'pvp' : 'pve';
+  if (target === 'pvp') {
+    removePveArena(record._id);
+    record.mode = 'pvp';
+    record.choosingAugment = false;
+    record.stealthOrigin = { x: record.x, y: record.y };
+    record.stealthUntil = now + rules.PVP_STEALTH_MS;
+    record.pvpEnteredAt = now;
+    record.pveCooldownUntil = now + rules.PVP_EXIT_COOLDOWN_MS;
+    record.pveFreeUntil = 0;
+  } else {
+    record.mode = 'pve';
+    record.stealthUntil = 0;
+    record.stealthOrigin = null;
+    record.pveCooldownUntil = 0;
+    record.pveFreeUntil = 0;
+    record.bossBuffUntil = 0;
+    createPveArena(record._id);
+  }
+  return record;
+}
+
+function switchMode(id, targetMode, now = Date.now()) {
+  const p = playerdb.get(id);
+  if (!p || p.hp <= 0) throw new Error('플레이어를 찾을 수 없습니다.');
+  const target = targetMode === 'pvp' ? 'pvp' : targetMode === 'pve' ? 'pve' : null;
+  if (!target) throw new Error('잘못된 모드입니다.');
+  if (p.mode === target) return p;
+
+  if (target === 'pvp') {
+    removePveArena(p._id);
+    p.x = Math.round((Math.random() * 2 - 1) * 1600);
+    p.y = Math.round((Math.random() * 2 - 1) * 1600);
+    p.vx = 0;
+    p.vy = 0;
+    p.physicsX = 0;
+    p.physicsY = 0;
+    p.physicsVx = 0;
+    p.physicsVy = 0;
+    p.physicsSeq = (p.physicsSeq || 0) + 1;
+    initPlayerMode(p, 'pvp', now);
+    return p;
+  }
+
+  const locked = now < (p.pveCooldownUntil || 0) && now >= (p.pveFreeUntil || 0);
+  if (locked) {
+    const leftSec = Math.ceil((p.pveCooldownUntil - now) / 1000);
+    throw new Error(`PvE 전환 대기 중입니다 (${leftSec}초 남음).`);
+  }
+  p.x = 0;
+  p.y = 0;
+  p.vx = 0;
+  p.vy = 0;
+  p.physicsX = 0;
+  p.physicsY = 0;
+  p.physicsVx = 0;
+  p.physicsVy = 0;
+  p.physicsSeq = (p.physicsSeq || 0) + 1;
+  initPlayerMode(p, 'pve', now);
+  progression.ensureOfferSync(p._id);
+  return p;
+}
+
+function reset() {
+  pveArenas.clear();
+  pvpArena.enemies = [];
+  pvpArena.projectiles = [];
+  pvpArena.hazards = [];
+  pvpArena.blasts = [];
+  pvpArena.posHistory = [];
+  pvpArena.encounters.clear();
+  pvpArena.bossKills = [];
+  pvpArena.threatLevel = 1;
+  pvpArena.seededMilestones = false;
+  pvpArena.nextPvpEliteAt = 0;
+  pvpArena.nextPvpBossAt = 0;
+  pvpArena.startedAt = null;
+}
+
+function drainBossKills(targetArena, now) {
+  if (!targetArena.bossKills || !targetArena.bossKills.length) return [];
+  const killers = targetArena.bossKills.splice(0);
+  for (const killerId of killers) {
+    progression.applyBossKillReward(killerId, now);
+  }
+  return killers;
 }
 
 function handleAttack(body, now = Date.now()) {
@@ -23,31 +135,30 @@ function handleAttack(body, now = Date.now()) {
     attacker.poses = body.poses;
     attacker.bursts = body.bursts;
   }
-  const result = arena.attack(attacker, now);
+  const targetArena = arenaFor(body && body.id);
+  const result = targetArena.attack(attacker, now);
+  const killers = drainBossKills(targetArena, now);
+  const attackerGotBoss = attacker && killers.includes(String(attacker._id));
   if (attacker) {
-    playLog.attack(attacker._id, result, now, arena.threat(now).level);
+    playLog.attack(attacker._id, result, now, targetArena.threat(now).level);
     const updated = progression.applyAttackOutcome(attacker._id, result, now);
-    if (updated && (result.heal || result.hpCost || result.shield || result.shieldAdd || result.shieldGained)) {
+    if (updated && (attackerGotBoss || result.heal || result.hpCost || result.shield || result.shieldAdd || result.shieldGained)) {
       result.record = progression.playerRecord(updated);
     }
+    if (attackerGotBoss) result.bossKill = true;
   }
   return result;
 }
 
-function tick(now = Date.now()) {
-  const players = playerdb.listLiving();
-  const connected = ioRef ? ioRef.engine.clientsCount : 0;
-  // Save idle CPU when the arena is completely empty and nobody is connected.
-  if (!players.length && !arena.enemies.length && !connected) return;
+function applyArenaStep(targetArena, arenaPlayers, now) {
+  const events = targetArena.step(arenaPlayers, now);
+  playLog.tick(arenaPlayers, targetArena, now);
 
-  const events = arena.step(players, now);
-  playLog.tick(players, arena, now);
-
-  for (const c of arena.playerCorrections) {
+  for (const c of targetArena.playerCorrections) {
     playerdb.applyPhysicsCorrection(c);
   }
-  const ledger = new Map(
-    players.map(p => [
+  targetArena.physicsLedger = new Map(
+    arenaPlayers.map(p => [
       String(p._id),
       {
         seq: p.physicsSeq || 0,
@@ -58,25 +169,72 @@ function tick(now = Date.now()) {
       },
     ])
   );
-  arena.physicsLedger = ledger;
 
   for (const event of events) {
     const change = progression.damageSync(event.id, event.amount, now);
     if (change) playLog.damage(event.id, { source: event.source, raw: event.amount, ...change });
   }
+  drainBossKills(targetArena, now);
+}
+
+function filterStateForPlayer(state, me, range = 1600) {
+  if (!state || !me) return state;
+  const mx = me.x || 0;
+  const my = me.y || 0;
+  const inRange = (x, y, pad = 0) => Math.abs((x || 0) - mx) <= range + pad && Math.abs((y || 0) - my) <= range + pad;
+  return {
+    ...state,
+    enemies: state.enemies.filter(e => e.tier === 'boss' || inRange(e.x, e.y, e.r || 0)),
+    projectiles: state.projectiles.filter(s => inRange(s.x, s.y, 120)),
+    hazards: state.hazards.filter(h => inRange(h.x, h.y, h.r || h.length || 0)),
+    blasts: state.blasts.filter(b => inRange(b.x, b.y, b.r || 0)),
+    skillZones: state.skillZones.filter(z => inRange(z.x, z.y, z.r || z.length || 0)),
+    walls: state.walls.filter(w => inRange(w.x, w.y, w.length || 0)),
+    decoys: state.decoys.filter(d => inRange(d.x, d.y)),
+  };
+}
+
+function tick(now = Date.now()) {
+  for (const id of pveArenas.keys()) {
+    const p = playerdb.get(id);
+    if (!p || p.mode !== 'pve' || p.hp <= 0) pveArenas.delete(id);
+  }
+
+  const players = playerdb.listLiving();
+  const pvpPlayers = players.filter(p => p.mode === 'pvp');
+  const pvePlayers = players.filter(p => p.mode !== 'pvp');
+  const connected = ioRef ? ioRef.engine.clientsCount : 0;
+  // Save idle CPU when all arenas are completely empty and nobody is connected.
+  if (!players.length && !pvpArena.enemies.length && !pveArenas.size && !connected) return;
+
+  if (pvpPlayers.length || pvpArena.enemies.length) {
+    applyArenaStep(pvpArena, pvpPlayers, now);
+  }
+  for (const p of pvePlayers) {
+    applyArenaStep(arenaFor(p._id), [p], now);
+  }
 
   if (ioRef && connected > 0) {
-    const shared = arena.state(now);
-    shared.players = playerdb.list().map(progression.playerPublic);
-    // One broadcast is encoded once for every client. Volatile drops stale
-    // snapshots on slow links instead of letting them pile up.
-    ioRef.volatile.emit('arena:state', shared);
-    // The small private record goes out per socket, reliably (a volatile one
-    // would be dropped behind the broadcast) and only when it changed.
+    let pvpShared = null;
     for (const socket of ioRef.sockets.sockets.values()) {
       const pid = socket.data && socket.data.pid;
       const me = pid && playerdb.get(pid);
-      if (!me) continue;
+      if (!me || me.hp <= 0) continue;
+      if (me.mode === 'pve') {
+        const pveState = arenaFor(me._id).state(now);
+        pveState.mode = 'pve';
+        pveState.players = [progression.playerPublic(me, now)];
+        (socket.volatile || socket).emit('arena:state', filterStateForPlayer(pveState, me));
+      } else {
+        if (!pvpShared) {
+          pvpShared = pvpArena.state(now);
+          pvpShared.mode = 'pvp';
+          pvpShared.players = pvpPlayers
+            .filter(p => !progression.isStealthed(p, now))
+            .map(p => progression.playerPublic(p, now));
+        }
+        (socket.volatile || socket).emit('arena:state', filterStateForPlayer(pvpShared, me));
+      }
       const record = progression.playerRecord(me);
       const key = JSON.stringify(record);
       if (socket.data.lastMe === key) continue;
@@ -104,4 +262,20 @@ function stop() {
   timer = null;
 }
 
-module.exports = { arena, start, stop, tick, setIo, handleAttack };
+module.exports = {
+  arena: pvpArena,
+  pvpArena,
+  pveArenas,
+  arenaFor,
+  createPveArena,
+  removePveArena,
+  initPlayerMode,
+  switchMode,
+  reset,
+  start,
+  stop,
+  tick,
+  setIo,
+  handleAttack,
+  filterStateForPlayer,
+};

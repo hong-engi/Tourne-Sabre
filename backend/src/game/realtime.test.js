@@ -11,10 +11,7 @@ beforeEach(() => {
   itemdb.clear();
   itemdb.setOnChange(null);
   progression.clearTimers();
-  runtime.arena.enemies = [];
-  runtime.arena.projectiles = [];
-  runtime.arena.hazards = [];
-  runtime.arena.blasts = [];
+  runtime.reset();
   runtime.setIo(null);
 });
 
@@ -84,9 +81,9 @@ test('in-memory progression preserves physics ledger corrections, offers, choice
   assert.ok(healed.hp > dmg.after.hp);
 });
 
-test('runtime tick broadcasts one shared arena:state and a private arena:me per socket', () => {
-  playerdb.addSync({ id: 'p1', name: 'One', pos: { x: 0, y: 0 }, speed: { x: 0, y: 0 }, hp: 100, hpmax: 100, xp: 0, lv: 1 });
-  const broadcast = [];
+test('runtime tick broadcasts pvp arena:state and isolated pve arena:state per socket', () => {
+  const p = playerdb.addSync({ id: 'p1', name: 'One', mode: 'pve', pos: { x: 0, y: 0 }, speed: { x: 0, y: 0 }, hp: 100, hpmax: 100, xp: 0, lv: 1 });
+  runtime.initPlayerMode(p, 'pve', 1000);
   const emitted = [];
   const fakeSocket = {
     data: { pid: 'p1' },
@@ -96,27 +93,28 @@ test('runtime tick broadcasts one shared arena:state and a private arena:me per 
   };
   const fakeIo = {
     engine: { clientsCount: 1 },
-    volatile: { emit: (event, payload) => broadcast.push({ event, payload }) },
+    volatile: { emit: () => {} },
     sockets: { sockets: new Map([['s1', fakeSocket]]) },
   };
   runtime.setIo(fakeIo);
   runtime.tick(1000);
 
-  assert.equal(broadcast.length, 1);
-  assert.equal(broadcast[0].event, 'arena:state');
-  assert.equal(broadcast[0].payload.players.length, 1);
-  assert.equal(broadcast[0].payload.players[0]._id, 'p1');
-  assert.equal(broadcast[0].payload.me, undefined, 'private record is not broadcast');
-  assert.equal(emitted.length, 1);
-  assert.equal(emitted[0].event, 'arena:me');
-  assert.equal(emitted[0].payload._id, 'p1');
-  assert.equal(emitted[0].payload.hp, 100);
+  const states = emitted.filter(e => e.event === 'arena:state');
+  const mes = emitted.filter(e => e.event === 'arena:me');
+  assert.equal(states.length, 1);
+  assert.equal(states[0].payload.mode, 'pve');
+  assert.equal(states[0].payload.players.length, 1);
+  assert.equal(states[0].payload.players[0]._id, 'p1');
+  assert.equal(mes.length, 1);
+  assert.equal(mes[0].payload._id, 'p1');
+  assert.equal(mes[0].payload.hp, 100);
   runtime.tick(1050);
-  assert.equal(emitted.length, 1, 'an unchanged record is not resent');
+  assert.equal(emitted.filter(e => e.event === 'arena:me').length, 1, 'an unchanged record is not resent');
   playerdb.get('p1').hp = 80;
   runtime.tick(1100);
-  assert.equal(emitted.length, 2);
-  assert.equal(emitted[1].payload.hp, 80);
+  const mesAfter = emitted.filter(e => e.event === 'arena:me');
+  assert.equal(mesAfter.length, 2);
+  assert.equal(mesAfter[1].payload.hp, 80);
 });
 
 test('enemy snapshots leave server-only AI fields behind and round floats', () => {
@@ -133,9 +131,10 @@ test('enemy snapshots leave server-only AI fields behind and round floats', () =
 });
 
 test('runtime handleAttack applies heal/shield outcomes directly in memory and returns updated record', () => {
-  const p = playerdb.addSync({ id: 'p1', name: 'One', pos: { x: 0, y: 0 }, speed: { x: 0, y: 0 }, hp: 50, hpmax: 100, xp: 0, lv: 1 });
+  const p = playerdb.addSync({ id: 'p1', name: 'One', mode: 'pve', pos: { x: 0, y: 0 }, speed: { x: 0, y: 0 }, hp: 50, hpmax: 100, xp: 0, lv: 1 });
+  runtime.initPlayerMode(p, 'pve', 5000);
   p.augments = ['spoils'];
-  const enemy = runtime.arena.spawn(p, 'stalker');
+  const enemy = runtime.arenaFor('p1').spawn(p, 'stalker');
   enemy.x = 0;
   enemy.y = -110;
   enemy.hp = 1;
@@ -165,4 +164,93 @@ test('attack windups carry remaining and total time for the client countdown', (
   assert.equal(seen.length, 3, 'charger winds up');
   assert.ok(seen.every(r => r.phaseTotal === seen[0].phaseTotal), 'total stays fixed through the windup');
   assert.ok(seen[0].phaseLeft > seen[1].phaseLeft && seen[1].phaseLeft > seen[2].phaseLeft, 'remaining time counts down');
+});
+
+test('back-to-back attacks 50ms apart both register hits and moving poses hit at earlier positions', () => {
+  const { EnemyArena } = require('./enemies');
+  const a = new EnemyArena(() => 0.37);
+  const p = { _id: 'p1', x: 0, y: 0, hp: 100, hpmax: 100, lv: 5, augments: [], r: 25, sw_angle: 0, sw_r: 65, sw_w: 40, sw_h: 100 };
+  const e1 = a.spawn(p, 'stalker', 1000, { x: 0, y: -110 });
+  const e2 = a.spawn(p, 'stalker', 1000, { x: 300, y: -110 });
+  e1.hp = 100;
+  e2.hp = 100;
+
+  const r1 = a.attack({ ...p, poses: [{ blade: 'main', x: 0, y: 0, sw_angle: 0, sw_r: 65, sw_w: 40, sw_h: 100 }] }, 1050);
+  assert.equal(r1.hits.length, 1);
+
+  // 50ms later, player has moved to x=500, but earlier pose at x=300 still hits e2.
+  const r2 = a.attack({ ...p, x: 500, y: 0, poses: [{ blade: 'main', x: 300, y: 0, sw_angle: 0, sw_r: 65, sw_w: 40, sw_h: 100 }] }, 1100);
+  assert.equal(r2.hits.length, 1);
+  assert.equal(r2.hits[0].id, e2.id);
+});
+
+test('lag compensation hits a fast enemy using its ~100ms-ago recorded position', () => {
+  const { EnemyArena } = require('./enemies');
+  const a = new EnemyArena(() => 0.37);
+  const p = { _id: 'p1', x: 0, y: 0, hp: 1e6, hpmax: 1e6, lv: 5, augments: [], r: 25, sw_angle: 0, sw_r: 65, sw_w: 40, sw_h: 100 };
+  const e = a.spawn(p, 'stalker', 1000, { x: 0, y: -110 });
+  e.hp = 100;
+  a.step([p], 1000);
+  // Move enemy out of sword reach by 1100ms, keeping its 1000ms position in posHistory.
+  e.x = 400;
+  e.y = -110;
+  a.posHistory.push({ t: 1000, pos: new Map([[e.id, { x: 0, y: -110 }]]) });
+  const res = a.attack({ ...p, poses: [{ blade: 'main', x: 0, y: 0, sw_angle: 0, sw_r: 65, sw_w: 40, sw_h: 100 }] }, 1100);
+  assert.equal(res.hits.length, 1);
+  assert.equal(res.hits[0].id, e.id);
+});
+
+test('snapshot omits unused enemy fields and default values', () => {
+  const { EnemyArena } = require('./enemies');
+  const a = new EnemyArena(() => 0.37);
+  const p = { _id: 'p1', x: 0, y: 0, hp: 100, hpmax: 100, lv: 5, augments: [], r: 25 };
+  const e = a.spawn(p, 'stalker', 1000, { x: 100, y: 0 });
+  e.tier = 'normal';
+  e.armor = 1;
+  e.angularVelocity = 2.7;
+  e.aimX = 0;
+  e.aimY = 0;
+  const [row] = a.snapshot(1000);
+  for (const dropped of ['level', 'xp', 'power', 'contact', 'seed', 'armor', 'angularVelocity', 'aimX', 'aimY', 'tier']) {
+    assert.equal(row[dropped], undefined, `${dropped} should be omitted`);
+  }
+  assert.equal(row.phase, 'hunt', 'phase is preserved');
+});
+
+test('runtime skips lobby sockets and filters out-of-range non-boss enemies', () => {
+  const p = playerdb.addSync({ id: 'p1', name: 'One', mode: 'pve', pos: { x: 0, y: 0 }, speed: { x: 0, y: 0 }, hp: 100, hpmax: 100, xp: 0, lv: 1 });
+  runtime.initPlayerMode(p, 'pve', 1000);
+
+  const lobbyEmitted = [];
+  const playerEmitted = [];
+  const fakeIo = {
+    engine: { clientsCount: 2 },
+    sockets: {
+      sockets: new Map([
+        ['lobby', { data: { pid: null }, emit: (e, d) => lobbyEmitted.push({ e, d }) }],
+        ['player', { data: { pid: 'p1' }, emit: (e, d) => playerEmitted.push({ e, d }) }],
+      ]),
+    },
+  };
+  runtime.setIo(fakeIo);
+  runtime.tick(1000);
+
+  assert.equal(lobbyEmitted.length, 0, 'lobby socket receives no arena:state');
+  assert.ok(playerEmitted.some(x => x.e === 'arena:state'));
+
+  const filtered = runtime.filterStateForPlayer({
+    enemies: [
+      { id: 'near', x: 200, y: 0, r: 20 },
+      { id: 'far', x: 2500, y: 0, r: 20 },
+      { id: 'boss', x: 2500, y: 0, r: 40, tier: 'boss' },
+    ],
+    projectiles: [{ id: 's1', x: 100, y: 0 }, { id: 's2', x: 2500, y: 0 }],
+    hazards: [],
+    blasts: [],
+    skillZones: [],
+    walls: [],
+    decoys: [],
+  }, p);
+  assert.deepEqual(filtered.enemies.map(e => e.id), ['near', 'boss']);
+  assert.deepEqual(filtered.projectiles.map(s => s.id), ['s1']);
 });

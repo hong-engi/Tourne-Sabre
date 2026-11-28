@@ -12,11 +12,13 @@ const {offerCount,DEFAULT_SPELLS,DEFAULT_SKILLS}=require('./gameRules');
 const socket = socketIOClient(API_ORIGIN, {transports: ['websocket']});
 map.attachSocket(socket);
 let player = null;
-const makePlayer = async (name, loadout={skills:DEFAULT_SKILLS,spells:DEFAULT_SPELLS}) => {
+const isStealthed = p => Boolean(p && (p.stealthUntil || 0) > map.serverNow());
+const makePlayer = async (name, loadout={skills:DEFAULT_SKILLS,spells:DEFAULT_SPELLS}, mode='pve') => {
   const next = new Player(name);
   next.loadout = [...loadout.skills];
   next.spells = [...loadout.spells];
   next.skills = createSkills();
+  next.mode = mode === 'pvp' ? 'pvp' : 'pve';
   next.augmentMenuOpen=false;
   map.reset();
   map.onBlast=blast=>addEffect('bomb',blast,'');
@@ -34,7 +36,7 @@ function death(myref) {
 }
 
 export function activateSkill(code) {
-  if (!player) return;
+  if (!player || isStealthed(player)) return;
   const from={x:player.pos.x,y:player.pos.y};
   const cast=activate(player, code, performance.now());
   if (cast==='blink') {addEffect('blink',from,'');addEffect('blink',player.pos,'');}
@@ -54,8 +56,15 @@ export function activateSkill(code) {
 }
 export function setAugmentMenu(open) {
   if(!player)return;
+  if(open && player.mode === 'pvp') return;
   player.augmentMenuOpen=open;player.augmentMenuAt=0;
   player.augmentPaused=open&&!map.sharedArena(player.id);
+}
+export async function switchMode(targetMode) {
+  if(!player)return;
+  await map.switchMode(player, targetMode);
+  resetEffects();
+  addEffect('level', player.pos, targetMode === 'pvp' ? 'PvP 진입 · 5초 은신' : '새 PvE 아레나 시작');
 }
 export async function chooseAugment(id) {
   if(!player)return;
@@ -85,7 +94,21 @@ export default function Canvas({myref, onStatus}) {
     const input = bindGameInput(window, () => !!player && !player.augmentPaused, activateSkill);
     resize();
     window.addEventListener('resize', resize);
-    const status = setInterval(() => onStatus(player ? {name: player.name, hp: player.hp, hpmax: player.hpmax, xp: player.xp, lv: player.lv, skills: skillSnapshot(player, performance.now()), direction:player.skills.direction, enemies:map.enemyList.length, augments:[...player.augments], augmentMenuOpen:player.augmentMenuOpen, augmentLive:!!player.augmentMenuOpen&&!player.augmentPaused, augmentOffer:player.augmentOffer||null, spells:player.spells, threat:map.threat} : null, socket.connected), 100);
+    const status = setInterval(() => {
+      const sNow = map.serverNow();
+      onStatus(player ? {
+        name: player.name, hp: player.hp, hpmax: player.hpmax, xp: player.xp, lv: player.lv,
+        skills: skillSnapshot(player, performance.now()), direction: player.skills.direction,
+        enemies: map.enemyList.length, augments: [...player.augments],
+        augmentMenuOpen: player.augmentMenuOpen, augmentLive: !!player.augmentMenuOpen && !player.augmentPaused,
+        augmentOffer: player.augmentOffer || null, spells: player.spells, threat: map.threat,
+        mode: player.mode || 'pve',
+        stealthLeft: Math.max(0, (player.stealthUntil || 0) - sNow),
+        pveCooldownLeft: Math.max(0, (player.pveCooldownUntil || 0) - sNow),
+        pveFreeLeft: Math.max(0, (player.pveFreeUntil || 0) - sNow),
+        bossBuffLeft: Math.max(0, (player.bossBuffUntil || 0) - sNow),
+      } : null, socket.connected);
+    }, 100);
     const render = time => {
       const dt=previousTime===undefined?1/60:Math.min(1/30,Math.max(0,(time-previousTime)/1000));
       previousTime=time;

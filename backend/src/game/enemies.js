@@ -1,4 +1,4 @@
-const {modifiers,stats,chargeDestination,SPELLS,SKILLS,kitOf}=require('../../../frontend/src/gameRules');
+const {modifiers,stats,chargeDestination,levelToThreat,SPELLS,SKILLS,kitOf}=require('../../../frontend/src/gameRules');
 const {CollisionWorld}=require('./collisions');
 const bestiary=require('./bestiary');
 const geometry=require('../../../frontend/src/hazardGeometry');
@@ -113,15 +113,25 @@ function bladePoses(player,arena) {
     groups.get(blade).push(pose);
   }
   if (!groups.has('main')) groups.set('main',[{sw_angle:player.sw_angle,sw_r:player.sw_r,sw_w:player.sw_w,sw_h:player.sw_h,power:1}]);
-  // Fill in-between steps so a fast spin or a thrust cannot skip an enemy.
+  // Fill in-between steps so a fast spin, thrust, or moving swing cannot skip an enemy.
   for (const [blade,poses] of groups) {
     const out=[];
     poses.forEach((q,i)=>{
       const prev=poses[i-1];
-      if (prev && prev.x===q.x && prev.y===q.y) {
-        const turn=Math.atan2(Math.sin(q.sw_angle-prev.sw_angle),Math.cos(q.sw_angle-prev.sw_angle));
-        const steps=Math.min(6,Math.ceil(Math.max(Math.abs(turn)/.1,Math.abs(q.sw_r-prev.sw_r)/15)));
-        for (let k=1;k<steps;k++) {const f=k/steps;out.push({...q,sw_angle:prev.sw_angle+turn*f,sw_r:prev.sw_r+(q.sw_r-prev.sw_r)*f});}
+      if (prev) {
+        const px0=prev.x??player.x,py0=prev.y??player.y,px1=q.x??player.x,py1=q.y??player.y;
+        const moveDist=Math.hypot(px1-px0,py1-py0);
+        if (moveDist<250) {
+          const turn=Math.atan2(Math.sin(q.sw_angle-prev.sw_angle),Math.cos(q.sw_angle-prev.sw_angle));
+          const steps=Math.min(6,Math.ceil(Math.max(Math.abs(turn)/.1,Math.abs(q.sw_r-prev.sw_r)/15,moveDist/25)));
+          const hasPos=prev.x!=null||q.x!=null;
+          for (let k=1;k<steps;k++) {
+            const f=k/steps;
+            const step={...q,sw_angle:prev.sw_angle+turn*f,sw_r:prev.sw_r+(q.sw_r-prev.sw_r)*f};
+            if (hasPos) {step.x=px0+(px1-px0)*f;step.y=py0+(py1-py0)*f;}
+            out.push(step);
+          }
+        }
       }
       out.push(q);
     });
@@ -137,7 +147,7 @@ function healFactor(player,mod) {
 // AI bookkeeping the client never reads (timers, internal targets, movement
 // parts). It stays on the server so each 20Hz state stays small; telegraphs
 // and shot paths are drawn by the client from phase/aim and velocity.
-const SERVER_ONLY=new Set(['name','path','leapFromX','leapFromY','phaseUntil','nextAttack','speedScale','nextShot','moveVx','moveVy','pushVx','pushVy',
+const SERVER_ONLY=new Set(['name','level','xp','power','contact','seed','path','leapFromX','leapFromY','phaseUntil','nextAttack','speedScale','nextShot','moveVx','moveVy','pushVx','pushVy',
   'staggerUntil','hopVx','hopVy','nextHop','recoveringMovement','chargeElapsed','chargeFromX','chargeFromY','ramp','shotCount','leapToX','leapToY',
   'leapStart','tpAt','pulseAt','motherId','hatchAt','keepAfterParent','dashX','dashY','spiralR','fullHp','coreContact','trailAt','buildX','buildY',
   'nextSpecial','expireAt','launchPillarId','launchAngle','arriveAt','arriveX','arriveY','callCount','offsetSide','baseSpeedScale','stakeSide',
@@ -161,9 +171,19 @@ function warnWindow(e,now) {
 }
 // Two decimals are plenty on screen and halve the size of every float.
 const wire=v=>typeof v==='number'&&!Number.isInteger(v)?Math.round(v*100)/100:v;
+const compactObj=obj=>{const out={};for(const k in obj){const v=obj[k];if(v!==undefined&&v!==null&&v!==false)out[k]=wire(v);}return out;};
 class EnemyArena {
-  constructor(random = Math.random) {
+  constructor(random = Math.random, options = {}) {
     this.random = random;
+    this.mode = options.mode === 'pvp' ? 'pvp' : 'pve';
+    this.nearbyRadius = options.nearbyRadius || 1200;
+    this.threatLevel = 1;
+    this.seededMilestones = false;
+    this.nextPvpEliteAt = 0;
+    this.nextPvpBossAt = 0;
+    this.pvpEliteIndex = 0;
+    this.pvpBossIndex = 0;
+    this.bossKills = [];
     this.enemies = [];
     this.projectiles = [];
     this.blasts = [];
@@ -181,6 +201,7 @@ class EnemyArena {
     this.playerInfo = new Map();
     this.physics=new CollisionWorld();this.playerCorrections=[];this.skillInit();
     this.hazards=[];this.trails=new Map();this.bleeds=new Map();this.lastPlayers=[];this.encounters=new Set();this.attackSerial=0;
+    this.posHistory=[];
   }
   byId(id){return id?this.enemies.find(e=>e.id===id&&e.hp>0):null;}
   // A telegraphed area attack. Drawn from creation until armAt, then deals
@@ -259,10 +280,10 @@ class EnemyArena {
   threat(now) {
     if (this.startedAt===null) return {level:1,elapsed:0};
     const elapsed=Math.max(0,now-this.startedAt);
-    return {level:1+Math.floor(elapsed/THREAT_STEP_MS),elapsed};
+    return {level:this.threatLevel||1,elapsed};
   }
-  spawn(player, type, now=this.lastTime ?? 0, at) {
-    const spec = TYPES[type],level=this.threat(now).level,scale=threatScale(level);
+  spawn(player, type, now=this.lastTime ?? 0, at, levelOverride) {
+    const spec = TYPES[type],level=levelOverride!=null?levelOverride:this.threat(now).level,scale=threatScale(level);
     if (!spec) throw new Error(`unknown enemy type ${type}`);
     let spawnX,spawnY;
     if (at) {spawnX=at.x;spawnY=at.y;}
@@ -344,6 +365,16 @@ class EnemyArena {
     const r=this.reward(credit);
     if (r&&e.loot) r.xp+=e.loot;
     if (r) {r.xp+=e.xp;r.kills++;if (info.thrust) r.thrustKills++;}
+    if (e.tier==='boss'&&this.mode==='pvp') {
+      this.nextPvpBossAt=Math.max(this.nextPvpBossAt||0,now+120000);
+      if (credit) {
+        this.bossKills.push(String(credit));
+        if (r) r.bossKill=true;
+      }
+    }
+    if (e.tier==='elite'&&this.mode==='pvp') {
+      this.nextPvpEliteAt=Math.max(this.nextPvpEliteAt||0,now+90000);
+    }
     const killer=credit&&this.playerInfo.get(credit),mod=killer?modifiers(killer.augments):null;
     if (e.type==='bomber') this.explode(e,now,{hurtPlayers:false,credit});
     this.onSkillKill(e,credit,killer,mod,now,info.flags);
@@ -437,9 +468,17 @@ class EnemyArena {
     for (const id of this.rewards.keys()) if (!living.some(p=>String(p._id)===id)) this.rewards.delete(id);
     for (const id of this.playerInfo.keys()) if (!living.some(p=>String(p._id)===id)) this.playerInfo.delete(id);
     for (const [key,until] of this.sourceImmunity) if (until<=now || !alive.has(key.split('|')[0])) this.sourceImmunity.delete(key);
-    if (!living.length) {this.enemies = [];this.projectiles=[];this.blasts=[];this.hazards=[];this.zones=[];this.walls=[];this.decoys=[];this.trails.clear();this.bleeds.clear();this.encounters.clear(); this.nextSpawn = now; this.startedAt=null; this.attackState.clear();this.physics.clear(); return [];}
+    if (!living.length) {
+      this.enemies = [];this.projectiles=[];this.blasts=[];this.hazards=[];this.zones=[];this.walls=[];this.decoys=[];
+      this.trails.clear();this.bleeds.clear();this.encounters.clear();this.bossKills=[];
+      this.nextSpawn = now;this.startedAt=null;this.threatLevel=1;this.seededMilestones=false;
+      this.nextPvpEliteAt=0;this.nextPvpBossAt=0;this.attackState.clear();this.physics.clear();
+      return [];
+    }
     this.lastPlayers=living;
-    if (!players.length) {
+    const active = living.filter(p => !p.choosingAugment && !((p.stealthUntil || 0) > now));
+    const allPaused = living.every(p => p.choosingAugment);
+    if (allPaused) {
       // Everyone is choosing an augment: freeze the room, including its clock.
       const shift=dt*1000;
       this.enemies.forEach(e=>{for (const k of ['nextShot','nextHop',...bestiary.TIME_FIELDS]) if (e[k]) e[k]+=shift;e.vx=0;e.vy=0;e.angularVelocity=0;});
@@ -448,37 +487,74 @@ class EnemyArena {
       this.nextSpawn+=dt*1000;if(this.startedAt!==null)this.startedAt+=dt*1000;
       return this.resolveContacts(living,now);
     }
+    if (!active.length) {
+      // Living players are all stealthed (e.g. solo PvP entry): do not target or hurt them.
+      return [];
+    }
+    players = active;
     if (this.startedAt===null) this.startedAt=now;
-    const {level}=this.threat(now);
+    const roomMaxLv = Math.max(...players.map(p => p.lv || 1));
+    const level = (this.nextSpawn === Infinity && this.encounters.size > 100) ? 1 : levelToThreat(roomMaxLv);
+    this.threatLevel = level;
     const plan=spawnPlan(level,players.length);
-    // Elites and bosses arrive once per threat milestone. While a boss is up,
-    // regular spawns thin out so its patterns stay readable.
-    const encounter=bestiary.encounterFor(level);
-    if (encounter&&!this.encounters.has(level)) {
-      this.encounters.add(level);
-      const player=players[Math.floor(this.random()*players.length)];
-      const a=this.random()*Math.PI*2,d=encounter.tier==='boss'?520:460;
-      this.spawn(player,encounter.type,now,{x:Math.max(-2800,Math.min(2800,player.x+Math.cos(a)*d)),y:Math.max(-2800,Math.min(2800,player.y+Math.sin(a)*d))});
+    if (this.mode === 'pve') {
+      if (!this.seededMilestones) {
+        this.seededMilestones = true;
+        for (let m = 1; m < level; m++) if (bestiary.encounterFor(m)) this.encounters.add(m);
+      }
+      for (let m = 1; m <= level; m++) {
+        const encounter = bestiary.encounterFor(m);
+        if (encounter && !this.encounters.has(m)) {
+          this.encounters.add(m);
+          const player = players[Math.floor(this.random()*players.length)];
+          const a=this.random()*Math.PI*2,d=encounter.tier==='boss'?520:460;
+          this.spawn(player,encounter.type,now,{x:Math.max(-2800,Math.min(2800,player.x+Math.cos(a)*d)),y:Math.max(-2800,Math.min(2800,player.y+Math.sin(a)*d))},level);
+        }
+      }
+    } else {
+      const topPlayer = players.reduce((best, p) => (p.lv || 1) > (best.lv || 1) ? p : best, players[0]);
+      if (level >= 3 && !this.enemies.some(e => e.tier === 'elite' && e.hp > 0) && now >= (this.nextPvpEliteAt || 0)) {
+        const type = bestiary.ELITES[(this.pvpEliteIndex++) % bestiary.ELITES.length];
+        const a = this.random()*Math.PI*2;
+        this.spawn(topPlayer, type, now, {x:Math.max(-2800,Math.min(2800,topPlayer.x+Math.cos(a)*460)),y:Math.max(-2800,Math.min(2800,topPlayer.y+Math.sin(a)*460))}, level);
+        this.nextPvpEliteAt = now + 90000;
+      }
+      if (level >= 5 && !this.enemies.some(e => e.tier === 'boss' && e.hp > 0) && now >= (this.nextPvpBossAt || 0)) {
+        const type = bestiary.BOSSES[(this.pvpBossIndex++) % bestiary.BOSSES.length];
+        const a = this.random()*Math.PI*2;
+        this.spawn(topPlayer, type, now, {x:Math.max(-2800,Math.min(2800,topPlayer.x+Math.cos(a)*520)),y:Math.max(-2800,Math.min(2800,topPlayer.y+Math.sin(a)*520))}, level);
+        this.nextPvpBossAt = now + 120000;
+      }
     }
     const bossUp=this.enemies.some(e=>e.tier==='boss'&&e.hp>0);
-    const regular=this.enemies.filter(e=>!e.part).length,cap=bossUp?Math.ceil(plan.cap*.45):plan.cap;
-    if (regular < cap && now >= this.nextSpawn) {
+    const regular=this.enemies.filter(e=>!e.part).length;
+    if (now >= this.nextSpawn) {
       const player = players[Math.floor(this.random() * players.length)];
-      if (!this.enemies.length) ['spinner','charger','stalker','spitter','bomber'].forEach(type => this.spawn(player, type, now));
-      else {
-        // Packs grow with the threat level; stalkers always arrive in packs (3-5, occasionally 10).
-        const pack=Math.min(cap-regular,plan.pack+(this.random()<.35?1:0));
-        for (let i=0;i<pack;i++) {
-          const picked=this.pickType(level);
-          if (picked==='stalker') {
-            const swarm=this.random()<.12?10:3+Math.floor(this.random()*3);
-            const limit=Math.min(swarm,Math.max(3,cap-this.enemies.filter(e=>!e.part).length+(swarm===10?6:0)));
-            const lead=this.spawn(player,'stalker',now);
-            for (let k=1;k<limit;k++) {
-              const a=k*2.399963,d=28+k*7;
-              this.spawn(player,'stalker',now,{x:Math.max(-2850,Math.min(2850,lead.x+Math.cos(a)*d)),y:Math.max(-2850,Math.min(2850,lead.y+Math.sin(a)*d))});
-            }
-          } else this.spawn(player, picked, now);
+      let spawnLevel = level;
+      if (this.mode === 'pvp') {
+        const nearby = players.filter(o => Math.hypot(o.x - player.x, o.y - player.y) <= this.nearbyRadius);
+        const nearMaxLv = Math.max(player.lv || 1, ...nearby.map(o => o.lv || 1));
+        spawnLevel = levelToThreat(nearMaxLv);
+      }
+      const spawnCadence = spawnPlan(spawnLevel, players.length);
+      const cap = bossUp ? Math.ceil(spawnCadence.cap * .45) : spawnCadence.cap;
+      if (regular < cap) {
+        if (!this.enemies.length) ['spinner','charger','stalker','spitter','bomber'].forEach(type => this.spawn(player, type, now, undefined, spawnLevel));
+        else {
+          // Packs grow with the threat level; stalkers always arrive in packs (3-5, occasionally 10).
+          const pack=Math.min(cap-regular,spawnCadence.pack+(this.random()<.35?1:0));
+          for (let i=0;i<pack;i++) {
+            const picked=this.pickType(spawnLevel);
+            if (picked==='stalker') {
+              const swarm=this.random()<.12?10:3+Math.floor(this.random()*3);
+              const limit=Math.min(swarm,Math.max(3,cap-this.enemies.filter(e=>!e.part).length+(swarm===10?6:0)));
+              const lead=this.spawn(player,'stalker',now,undefined,spawnLevel);
+              for (let k=1;k<limit;k++) {
+                const a=k*2.399963,d=28+k*7;
+                this.spawn(player,'stalker',now,{x:Math.max(-2850,Math.min(2850,lead.x+Math.cos(a)*d)),y:Math.max(-2850,Math.min(2850,lead.y+Math.sin(a)*d))},spawnLevel);
+              }
+            } else this.spawn(player, picked, now, undefined, spawnLevel);
+          }
         }
       }
       this.nextSpawn = now + plan.interval*(bossUp?2.5:1);
@@ -701,7 +777,7 @@ class EnemyArena {
       this.damageEnemy(e,e.burnDamage,e.burnBy,{flags:{burn:true}},now);
     }
     this.enemies=this.enemies.filter(e=>e.hp>0);
-    damage.push(...this.resolveContacts(living,now));
+    damage.push(...this.resolveContacts(players,now));
     // Body collision damage is handled once by the solid-body solver. Only
     // the spinner's separate weapon can produce an additional contact here.
     this.enemies.forEach(e=>players.forEach(target=>{
@@ -713,6 +789,8 @@ class EnemyArena {
         damage.push({id,amount:this.outgoing(e,22*(e.power||1),now),source:`${e.type}:blade`});
       }
     }));
+    this.posHistory.push({t:now,pos:new Map(this.enemies.map(e=>[e.id,{x:e.x,y:e.y}]))});
+    while(this.posHistory.length&&this.posHistory[0].t<now-220)this.posHistory.shift();
     return this.shapeIncoming(players,damage,now);
   }
   stepProjectiles(players,now,dt) {
@@ -803,14 +881,15 @@ class EnemyArena {
     return true;
   }
   attack(player, now) {
-    if (!player || player.hp<=0 || player.choosingAugment) return {hits:[],xp:0};
+    if (!player || player.hp<=0 || player.choosingAugment || (player.stealthUntil || 0) > now) return {hits:[],xp:0};
     const id=String(player._id), mod=modifiers(player.augments), skill=player.skillState || {};
-    if (now-(this.lastAttack.get(id) ?? -Infinity)<150) return {hits:[],xp:0};
+    if (now-(this.lastAttack.get(id) ?? -Infinity)<40) return {hits:[],xp:0};
     this.lastAttack.set(id,now);
     this.playerInfo.set(id,{augments:player.augments||[],lv:player.lv||1});
     const state=this.combatState(id,player.lv||1),ignited=now<state.igniteUntil;
     if (mod.reverse && skill.reverseToken!==state.token) {state.token=skill.reverseToken;state.charges=5;}
-    const base=stats(player.lv,player.augments).damage*mod.damageScale;
+    const bossMult=(player.bossBuffUntil||0)>now?1.25:1;
+    const base=stats(player.lv,player.augments).damage*mod.damageScale*bossMult;
     // Riposte: the first main-blade hit within 3s of being hurt doubles, once
     // per hurt and at most every 3s.
     const hurtAt=this.lastHurt.get(id);
@@ -878,6 +957,12 @@ class EnemyArena {
         });
       }
     };
+    let histPos=null,bestDiff=Infinity;
+    for (const entry of this.posHistory) {
+      if (entry.t<now-180||entry.t>now-40) continue;
+      const diff=Math.abs(entry.t-(now-100));
+      if (diff<bestDiff) {bestDiff=diff;histPos=entry.pos;}
+    }
     for (const [blade,poses] of blades) {
       // One hit per pass: an enemy is struck when this blade enters it, not
       // again while it stays inside the blade.
@@ -885,8 +970,11 @@ class EnemyArena {
         if (e.hp<=0) continue;
         const key=`${blade}|${e.id}`;
         let touching=state.touching.has(key),pose=null;
+        const h=histPos&&histPos.get(e.id);
+        const histEnemy=h&&(h.x!==e.x||h.y!==e.y)?{...e,x:h.x,y:h.y}:null;
         for (const q of poses) {
-          const hit=swordHits({...player,...q,x:q.x??player.x,y:q.y??player.y},e);
+          const p={...player,...q,x:q.x??player.x,y:q.y??player.y};
+          const hit=swordHits(p,e)||(histEnemy&&swordHits(p,histEnemy));
           if (hit&&!touching&&!pose) pose=q;
           touching=hit;
         }
@@ -928,7 +1016,7 @@ class EnemyArena {
       state.vampHealed+=lord;
     }
     const extra=this.attackExtras(player,state,mod,result,now);
-    return {hits:result.hits,xp:result.xp,thrustKills:result.thrustKills,shieldGained:mod.spoils ? kills*20 : 0,
+    return {hits:result.hits,xp:result.xp,thrustKills:result.thrustKills,bossKill:!!result.bossKill,shieldGained:mod.spoils ? kills*20 : 0,
       heal:Math.round((mod.vampireHeal*Math.min(kills,5)+lord+this.breathe(id,player,state,mod,now))*healFactor(player,mod))+extra.heal,
       shield:extra.shield,shieldMs:extra.shieldMs,shieldAdd:extra.shieldAdd,hpCost:extra.hpCost,refunds:extra.refunds,flags:extra.flags,marks:result.marks||[]};
   }
@@ -988,22 +1076,26 @@ class EnemyArena {
     // false/null read the same as missing on the client, so they are not sent.
     for (const k in e) if (!SERVER_ONLY.has(k)&&e[k]!==false&&e[k]!=null) row[k]=wire(e[k]);
     if (e.phase!=='charge') {delete row.chargeEndX;delete row.chargeEndY;}
+    if (row.armor===1) delete row.armor;
+    if (row.angularVelocity===2.7) delete row.angularVelocity;
+    if (row.aimX===0&&row.aimY===0) {delete row.aimX;delete row.aimY;}
+    if (row.tier==='normal') delete row.tier;
     const warn=warnWindow(e,now);
     if (warn) {row.phaseLeft=Math.round(warn.left);row.phaseTotal=Math.max(1,Math.round(warn.total));}
     if ((e.type==='splitter'||e.type==='mite')&&e.nextHop) {
       const interval=e.type==='splitter'?SPLITTER_HOP_MS:MITE_HOP_MS;
-      row.hopProgress=Math.max(0,Math.min(1,(now-e.nextHop+interval)/Math.min(420,interval)));
+      row.hopProgress=wire(Math.max(0,Math.min(1,(now-e.nextHop+interval)/Math.min(420,interval))));
     }
-    if (e.type==='bomber'&&e.phase==='fuse') {row.fuseLeft=Math.max(0,e.phaseUntil-now);row.fuseTotal=BOMB_FUSE_MS;}
-    if (e.type==='shellback') row.blockFlash=now<(e.blockFlashUntil||0);
+    if (e.type==='bomber'&&e.phase==='fuse') {row.fuseLeft=Math.round(Math.max(0,e.phaseUntil-now));row.fuseTotal=BOMB_FUSE_MS;}
+    if (e.type==='shellback'&&now<(e.blockFlashUntil||0)) row.blockFlash=true;
     if (e.type==='flea'&&e.phase==='leap'&&e.phaseUntil>e.leapStart) {
       const t=Math.max(0,Math.min(1,(now-e.leapStart)/(e.phaseUntil-e.leapStart)));
-      row.leapArc=Math.sin(t*Math.PI);
+      row.leapArc=wire(Math.sin(t*Math.PI));
       row.leapDir=e.vx<0?-1:1;
     }
-    if (e.type==='egg'&&e.hatchAt) {row.hatchLeft=Math.max(0,e.hatchAt-now);row.hatchTotal=2200;}
+    if (e.type==='egg'&&e.hatchAt) {row.hatchLeft=Math.round(Math.max(0,e.hatchAt-now));row.hatchTotal=2200;}
     if (e.type==='shroom'&&e.tpAt&&now-e.tpAt<450) {
-      row.tpFromX=e.tpFromX;row.tpFromY=e.tpFromY;row.tpProgress=(now-e.tpAt)/450;
+      row.tpFromX=wire(e.tpFromX);row.tpFromY=wire(e.tpFromY);row.tpProgress=wire((now-e.tpAt)/450);
     }
     return row;
   });}
@@ -1011,16 +1103,16 @@ class EnemyArena {
     return {enemies:this.snapshot(now),
       projectiles:this.projectiles.map(({id,owner,x,y,vx,vy,r,kind})=>({id,owner,x:wire(x),y:wire(y),vx:wire(vx),vy:wire(vy),r,kind})),
       // Hazard timing is relative (ms from now) so clients need no clock sync.
-      hazards:this.hazards.map(h=>({id:h.id,kind:h.kind,x:h.x,y:h.y,r:h.r,angle:h.angle,length:h.length,width:h.width,spread:h.spread,
-        from:h.from,to:h.to,band:h.band,gapAngle:h.gapAngle,gapSize:h.gapSize,gapCount:h.gapCount||1,armIn:h.armAt-now,left:h.until-now,total:h.armAt-h.born,
+      hazards:this.hazards.map(h=>compactObj({id:h.id,kind:h.kind,x:h.x,y:h.y,r:h.r,angle:h.angle,length:h.length,width:h.width,spread:h.spread,
+        from:h.from,to:h.to,band:h.band,gapAngle:h.gapAngle,gapSize:h.gapSize,gapCount:h.gapCount>1?h.gapCount:undefined,armIn:Math.round(h.armAt-now),left:Math.round(h.until-now),total:Math.round(h.armAt-h.born),
         harmful:h.damage>0||!!h.telegraph,bar:!!h.bar,arrow:!!h.arrow,sweep:!!h.sweep,bomb:!!h.bomb,fromX:h.fromX,fromY:h.fromY,effect:h.effect,force:h.force,style:h.fire?'fire':h.poison?'poison':h.frost?'frost':h.wind?'wind':h.trap?'trap':h.echo?'echo':h.chain?'chain':h.marker?'marker':null})),
-      blasts:this.blasts.map(({id,x,y,r})=>({id,x,y,r})),threat:this.threat(now),
+      blasts:this.blasts.map(({id,x,y,r})=>({id,x:wire(x),y:wire(y),r:wire(r)})),threat:this.threat(now),
       // Player skill areas, drawn in the owner's colours (timing relative).
-      skillZones:this.zones.filter(z=>z.power>0||z.status||z.pull||z.sanctum||z.banner).map(z=>({id:z.id,owner:z.owner,skill:z.skill,kind:z.shape,x:z.x,y:z.y,r:z.r,angle:z.angle,length:z.len,width:z.w,spread:z.spread,
-        age:now-z.born,every:z.every,tag:z.tag,bladeAngle:z.bladeAngle,spinDirection:z.spinDirection,armIn:z.armAt-now,left:z.until-now,warn:!!z.warn,support:!!(z.sanctum||z.banner),
-        echo:z.echo||null,echoLead:!!z.echoLead,...(z.echo?{castX:z.castX,castY:z.castY}:{})})),
-      walls:this.walls.map(w=>({id:w.id,owner:w.owner,x:w.x,y:w.y,angle:w.angle,length:w.len,width:w.w,left:w.until-now})),
-      decoys:this.decoys.map(d=>({id:d.id,owner:d.owner,x:d.x,y:d.y,left:d.until-now})),
+      skillZones:this.zones.filter(z=>z.power>0||z.status||z.pull||z.sanctum||z.banner).map(z=>{const row=compactObj({id:z.id,owner:z.owner,skill:z.skill,kind:z.shape,x:z.x,y:z.y,r:z.r,angle:z.angle,length:z.len,width:z.w,spread:z.spread,
+        age:Math.round(now-z.born),every:z.every,tag:z.tag,bladeAngle:z.bladeAngle,spinDirection:z.spinDirection,armIn:Math.round(z.armAt-now),left:Math.round(z.until-now),warn:!!z.warn,support:!!(z.sanctum||z.banner),
+        echo:z.echo||null,...(z.echo?{castX:z.castX,castY:z.castY}:{})});if(z.echo)row.echoLead=!!z.echoLead;return row;}),
+      walls:this.walls.map(w=>compactObj({id:w.id,owner:w.owner,x:w.x,y:w.y,angle:w.angle,length:w.len,width:w.w,left:Math.round(w.until-now)})),
+      decoys:this.decoys.map(d=>compactObj({id:d.id,owner:d.owner,x:d.x,y:d.y,left:Math.round(d.until-now)})),
       physics:Object.fromEntries(this.physicsLedger||[])};
   }
 }

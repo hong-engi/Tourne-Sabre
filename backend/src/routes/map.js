@@ -2,7 +2,7 @@ const express = require('express');
 const itemdb = require('../db/itemdb');
 const playerdb = require('../db/playerdb');
 const router = express.Router();
-const { arena, handleAttack } = require('../game/runtime');
+const { arena, arenaFor, handleAttack } = require('../game/runtime');
 const progression = require('../game/progression');
 const { playLog } = require('../game/playLog');
 
@@ -18,7 +18,7 @@ router.post('/enemy/attack', (req, res) => {
 
 router.post('/player/:id/spell', (req, res) => {
   try {
-    const row = progression.castSpellSync(req.params.id, req.body && req.body.spell, arena);
+    const row = progression.castSpellSync(req.params.id, req.body && req.body.spell, arenaFor(req.params.id));
     playLog.spell(req.params.id, req.body && req.body.spell);
     res.json(row);
   } catch (err) {

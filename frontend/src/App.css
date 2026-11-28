@@ -173,6 +173,29 @@ button.augment-card:disabled { cursor: default; opacity: .6; }
 .skill-spell.skill-active { --state-color: #ffe095; }
 
 .threat-hud { display: flex; justify-content: space-between; margin-bottom: 6px; font: 600 11px 'SFMono-Regular', Consolas, monospace; color: #f0a989; letter-spacing: .5px; }
+
+/* Lobby mode selector & in-game PvE/PvP mode HUD */
+.mode-select { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 14px; }
+.join-form .mode-option { display: flex; flex-direction: column; align-items: flex-start; gap: 3px; margin: 0; padding: 10px 12px; background: #0c171c; border: 1px solid #56736880; color: #b7c8be; box-shadow: none; font-family: system-ui, sans-serif; text-align: left; }
+.join-form .mode-option strong { font-size: 12px; color: #e4ecdd; letter-spacing: 0; }
+.join-form .mode-option span { font-size: 10px; line-height: 1.3; color: #839a8f; letter-spacing: 0; }
+.join-form .mode-option.mode-selected { background: #182f36; border-color: #b7d993; box-shadow: inset 0 0 0 1px #b7d993; }
+.join-form .mode-option.mode-selected strong { color: #d6f0b6; }
+
+.mode-hud { position: absolute; top: 14px; right: 16px; z-index: 6; display: flex; flex-direction: column; align-items: flex-end; gap: 6px; pointer-events: none; }
+.mode-hud-row { display: flex; align-items: center; gap: 8px; pointer-events: auto; }
+.mode-badge { padding: 5px 10px; font: 700 11px 'SFMono-Regular', Consolas, monospace; border: 1px solid #56736880; background: #101d23e8; color: #d5e5d2; }
+.mode-pve { border-color: #82d9ba88; color: #a8f0d4; }
+.mode-pvp { border-color: #ed9a7d88; color: #ffb99e; }
+.mode-switch-btn { padding: 5px 11px; font: 600 11px system-ui, sans-serif; border: 1px solid #8fa78588; background: #172b33eb; color: #e2eee0; cursor: pointer; }
+.mode-switch-btn:hover:enabled { background: #23404b; border-color: #d0e8af; }
+.mode-switch-btn:disabled { opacity: .55; cursor: not-allowed; }
+.mode-switch-free { border-color: #ffd87a; color: #ffe6a3; background: #3b3018eb; }
+.mode-pill { padding: 4px 10px; font: 600 11px system-ui, sans-serif; border: 1px solid #56736880; background: #0d181ee6; color: #d9e7df; }
+.mode-pill-stealth { border-color: #7eeeff99; color: #a7f4ff; }
+.mode-pill-buff { border-color: #ffd87a99; color: #ffe5a1; }
+.mode-pill-error { border-color: #ff9b8799; color: #ffb39f; }
+.augment-locked { opacity: .65; cursor: not-allowed; }
 @media(max-width:540px) { .skill-picker-overlay { padding: 12px; } .skill-picker { padding: 16px; } .skill-picker-grid { grid-template-columns: 1fr; } }
 .skill-spell.skill-paused { --state-color: #718079; }
 .skill-slot:not(.skill-spell) + .skill-spell { margin-left: 10px; }

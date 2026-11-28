@@ -8,7 +8,11 @@ const clampCoord = v => Math.max(-2975, Math.min(2975, v));
 
 const wire = v => (typeof v === 'number' && !Number.isInteger(v) ? Math.round(v * 100) / 100 : v);
 
-function playerPublic(p) {
+function isStealthed(p, now = Date.now()) {
+  return Boolean(p && (p.stealthUntil || 0) > now);
+}
+
+function playerPublic(p, now = Date.now()) {
   if (!p) return null;
   return {
     _id: p._id,
@@ -27,6 +31,8 @@ function playerPublic(p) {
     hpmax: p.hpmax,
     lv: p.lv,
     color: p.color,
+    mode: p.mode || 'pve',
+    bossBuff: (p.bossBuffUntil || 0) > now,
   };
 }
 
@@ -43,6 +49,12 @@ function playerRecord(p) {
     invulnerableUntil: p.invulnerableUntil,
     augments: p.augments,
     augmentOffer: p.augmentOffer,
+    mode: p.mode || 'pve',
+    stealthUntil: p.stealthUntil || 0,
+    stealthOrigin: p.stealthOrigin || null,
+    pveCooldownUntil: p.pveCooldownUntil || 0,
+    pveFreeUntil: p.pveFreeUntil || 0,
+    bossBuffUntil: p.bossBuffUntil || 0,
     physicsSeq: p.physicsSeq,
     physicsX: p.physicsX,
     physicsY: p.physicsY,
@@ -53,7 +65,7 @@ function playerRecord(p) {
 
 function damageSync(id, amount, now = Date.now()) {
   const p = playerdb.get(id);
-  if (!p) return undefined;
+  if (!p || isStealthed(p, now)) return undefined;
   const change = rules.resolveDamage(p, Math.max(0, Number(amount) || 0), now);
   const before = {
     hp: p.hp,
@@ -67,7 +79,7 @@ function damageSync(id, amount, now = Date.now()) {
 
 function ensureOfferSync(id) {
   const p = playerdb.get(id);
-  if (!p || p.hp <= 0 || p.augmentOffer || (p.augments || []).length >= rules.offerCount(p.lv)) return p;
+  if (!p || p.hp <= 0 || p.mode === 'pvp' || p.augmentOffer || (p.augments || []).length >= rules.offerCount(p.lv)) return p;
   const offer = rules.rollOffer(p.augments, Math.random, kit(p), p.tierPity, p.lv || 1);
   if (!offer) return p;
   p.augmentOffer = offer;
@@ -103,9 +115,8 @@ function syncSync(body) {
   p.sw_h = body.sw_h;
   p.sw_speed = body.sw_speed;
   p.skillState = body.combatState || {};
-  // The augment picker pauses only a solo run; with other players alive the
-  // room keeps going so nobody can hide in the menu during PvP.
-  p.choosingAugment = !!body.augmentMenuOpen && !playerdb.listLiving().some(o => o._id !== p._id);
+  // Only solo PvE runs pause for the augment picker; PvP never opens or pauses for augments.
+  p.choosingAugment = p.mode !== 'pvp' && !!body.augmentMenuOpen && !playerdb.listLiving().some(o => o._id !== p._id && o.mode === p.mode);
   p.xp = xp;
   p.lv = lv;
   p.hp = Math.min(hpmax, p.hp + Math.max(0, hpmax - p.hpmax));
@@ -114,6 +125,10 @@ function syncSync(body) {
 }
 
 function chooseSync(id, augment) {
+  const raw = playerdb.get(id);
+  if (raw && raw.mode === 'pvp') {
+    throw new Error('PvP 모드에서는 증강을 선택할 수 없습니다. PvE로 전환해 주세요.');
+  }
   const p = ensureOfferSync(id);
   if (!p || p.hp <= 0 || !rules.canChoose(p.augments, p.lv, augment, p.augmentOffer)) {
     throw new Error('지금 제시된 증강 중에서 골라 주세요.');
@@ -129,6 +144,10 @@ function chooseSync(id, augment) {
 }
 
 function rerollSync(id, index) {
+  const raw = playerdb.get(id);
+  if (raw && raw.mode === 'pvp') {
+    throw new Error('PvP 모드에서는 증강을 선택할 수 없습니다. PvE로 전환해 주세요.');
+  }
   const p = ensureOfferSync(id);
   if (!p || !p.augmentOffer) throw new Error('다시 뽑을 증강이 없습니다.');
   const offer = rules.rerollOffer(p.augments, p.augmentOffer, Number(index), Math.random, kit(p));
@@ -150,6 +169,9 @@ function castSpellSync(id, spellId, arena, now = Date.now()) {
   const spell = rules.SPELLS.find(s => s.id === spellId);
   if (!p || p.hp <= 0 || !spell || !rules.validSpells(p.spells).includes(spellId)) {
     throw new Error('그 주문을 사용할 수 없습니다.');
+  }
+  if (isStealthed(p, now)) {
+    throw new Error('은신 중에는 스킬을 사용할 수 없습니다.');
   }
   const key = `${id}|${spellId}`;
   if (now < (spellTimes.get(key) || 0)) throw new Error(`${spell.name} 주문이 아직 준비되지 않았습니다.`);
@@ -218,6 +240,20 @@ function applyAttackOutcome(id, result, now = Date.now()) {
   return p;
 }
 
+function applyBossKillReward(id, now = Date.now()) {
+  const p = playerdb.get(id);
+  if (!p || p.hp <= 0) return null;
+  const missing = Math.max(0, (p.hpmax || 100) - p.hp);
+  p.hp = Math.min(p.hpmax || 100, p.hp + Math.round(missing * 0.5));
+  const bonus = Math.round((p.hpmax || 100) * 0.5);
+  const activeShield = p.shieldUntil > now ? p.shield || 0 : 0;
+  p.shield = Math.max(activeShield, bonus);
+  p.shieldUntil = Math.max(p.shieldUntil || 0, now + rules.BOSS_SHIELD_MS);
+  p.bossBuffUntil = Math.max(p.bossBuffUntil || 0, now + rules.BOSS_BUFF_MS);
+  p.pveFreeUntil = Math.max(p.pveFreeUntil || 0, now + rules.BOSS_PVE_FREE_MS);
+  return p;
+}
+
 function clearTimers() {
   healTimes.clear();
   spellTimes.clear();
@@ -248,6 +284,8 @@ module.exports = {
   pickupHeal,
   pickupHealSync,
   applyAttackOutcome,
+  applyBossKillReward,
+  isStealthed,
   playerPublic,
   playerRecord,
   clearTimers,

@@ -39,7 +39,7 @@ test('threat scaling: health, damage and spawn rate keep rising',()=>{
 });
 test('a boss spawns once at threat 5 and regular spawns thin out around it',()=>{
   const a=new EnemyArena(()=>.4),p=player();
-  a.step([p],0);a.startedAt=-4*40000;a.encounters.add(3);
+  a.step([p],0);p.lv=9;a.encounters.add(3);
   a.step([p],100);
   assert.equal(a.enemies.filter(e=>e.type==='swordsaint').length,1);
   a.step([p],200);

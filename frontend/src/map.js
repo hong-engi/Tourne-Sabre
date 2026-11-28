@@ -4,18 +4,26 @@ import {API_ORIGIN} from './apiConfig';
 const {modifiers,stats}=require('./gameRules');
 const api=axios.create({baseURL:`${API_ORIGIN}/map`,timeout:3000});
 
+const r2=v=>typeof v==='number'&&!Number.isInteger(v)?Math.round(v*100)/100:v;
+
 export function compactPlayerSync(player){
+  const cs={};
+  if(player.combatState){
+    for(const [k,v] of Object.entries(player.combatState)){
+      if(v!==false&&v!=null)cs[k]=v;
+    }
+  }
   return {
     id:player.id,
-    pos:{x:player.pos.x,y:player.pos.y},
-    speed:{x:player.speed.x,y:player.speed.y},
-    impactIntent:player.impactIntent?{x:player.impactIntent.x,y:player.impactIntent.y}:undefined,
-    sw_angle:player.sw_angle,
-    sw_r:player.sw_r,
-    sw_w:player.sw_w,
-    sw_h:player.sw_h,
-    sw_speed:player.sw_speed,
-    combatState:player.combatState||{},
+    pos:{x:r2(player.pos.x),y:r2(player.pos.y)},
+    speed:{x:r2(player.speed.x),y:r2(player.speed.y)},
+    impactIntent:player.impactIntent?{x:r2(player.impactIntent.x),y:r2(player.impactIntent.y)}:undefined,
+    sw_angle:r2(player.sw_angle),
+    sw_r:r2(player.sw_r),
+    sw_w:r2(player.sw_w),
+    sw_h:r2(player.sw_h),
+    sw_speed:r2(player.sw_speed),
+    combatState:cs,
     augmentMenuOpen:!!player.augmentMenuOpen,
     xp:player.xp,
     physicsAck:player.physicsAck,
@@ -41,6 +49,7 @@ function compactPlayerJoin(player){
     color:player.color,
     spells:player.spells,
     loadout:player.loadout,
+    mode:player.mode||'pve',
   };
 }
 
@@ -76,7 +85,10 @@ class MapState {
     this.enemyMotion=new MotionBuffer(60);this.playerMotion=new MotionBuffer();
     this.enemyPending=false;this.nextEnemy=0;this.nextItems=0;
     this.projectiles={list:[],at:0};this.threat={level:1,elapsed:0};this.seenBlasts=new Set();this.hazards={list:[],at:0};this.skillZones={list:[],walls:[],decoys:[],at:0};
-    this.socket=null;this.activePlayer=null;this.warnClock=new Map();
+    this.socket=null;this.activePlayer=null;this.warnClock=new Map();this.clockOffset=0;
+  }
+  serverNow(){
+    return Date.now()+(this.clockOffset||0);
   }
   reset(){
     this.nextSync=0;this.nextAttack=0;this.enemyList=[];this.enemyMotion.clear();this.playerMotion.clear();this.nextEnemy=0;this.nextItems=0;
@@ -185,6 +197,7 @@ class MapState {
   // True when another living player shares the arena: the augment picker
   // then must not pause the game (PvP).
   sharedArena(id){
+    if(this.activePlayer&&this.activePlayer.mode==='pvp')return true;
     return this.playerList.some(p=>p&&p.hp>0&&p._id!==id);
   }
   hasLiveSocket(){
@@ -231,12 +244,22 @@ class MapState {
     player.shield=row.shieldUntil>Date.now()?row.shield:0;player.reviveUsed=row.reviveUsed;player.invulnerableUntil=row.invulnerableUntil;
     player.hpmax=nextHpmax;
     player.augmentOffer=row.augmentOffer||null;
+    if(row.mode){
+      player.mode=row.mode;
+      if(row.mode==='pvp'){player.augmentMenuOpen=false;player.augmentPaused=false;}
+    }
+    player.stealthUntil=row.stealthUntil||0;
+    player.stealthOrigin=row.stealthOrigin||null;
+    player.pveCooldownUntil=row.pveCooldownUntil||0;
+    player.pveFreeUntil=row.pveFreeUntil||0;
+    player.bossBuffUntil=row.bossBuffUntil||0;
   }
   async addPlayer(player){
     this.activePlayer=player;
     if(this.hasLiveSocket()){
       const res=await this.emitWithAck('player:join',compactPlayerJoin(player));
       if(!res||!res.ok)throw new Error((res&&res.error)||'Failed to join arena');
+      if(Number.isFinite(res.serverTime))this.clockOffset=res.serverTime-Date.now();
       this.playerList=res.players||[];
       if(Array.isArray(res.items))this.applyItemList(res.items);
       if(res.player)this.applyRecord(player,res.player);
@@ -245,6 +268,20 @@ class MapState {
     await api.post('/player/add',compactPlayerJoin(player));
     this.playerList=(await api.get('/player')).data;
     if(!this.itemList.length)this.applyItemList((await api.get('/item')).data);
+  }
+  async switchMode(player,targetMode){
+    if(!this.hasLiveSocket())throw new Error('소켓이 연결되어 있지 않습니다.');
+    const res=await this.emitWithAck('mode:switch',{id:player.id,mode:targetMode});
+    if(!res||!res.ok)throw new Error((res&&res.error)||'모드 전환에 실패했습니다.');
+    if(Number.isFinite(res.serverTime))this.clockOffset=res.serverTime-Date.now();
+    this.enemyList=[];this.enemyMotion.clear();this.playerMotion.clear();
+    this.projectiles={list:[],at:0};this.hazards={list:[],at:0};
+    this.skillZones={list:[],walls:[],decoys:[],at:0};this.warnClock.clear();
+    if(res.pos){player.pos.x=res.pos.x;player.pos.y=res.pos.y;}
+    player.speed.x=0;player.speed.y=0;
+    player.physicsAck={seq:res.player?.physicsSeq||0,x:0,y:0,vx:0,vy:0};
+    if(res.player)this.applyRecord(player,res.player);
+    return res.player;
   }
   async chooseAugment(player,augment){
     if(this.hasLiveSocket()){
@@ -307,7 +344,7 @@ class MapState {
     const payload={id:player.id,pos:{x:player.pos.x,y:player.pos.y},poses,bursts};
     this.attackPending=true;
     if(this.hasLiveSocket()){
-      this.nextAttack=now+100;
+      this.nextAttack=now+50;
       this.emitWithAck('enemy:attack',payload,2500).then(result=>{
         if(player.hp>0&&result){
           if(result.record)this.applyRecord(player,result.record);
