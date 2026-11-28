@@ -26,6 +26,17 @@ import shroomUrl from './assets/pixel/shroom.png';
 import lanternUrl from './assets/pixel/lantern.png';
 import leechUrl from './assets/pixel/leech.png';
 import bellUrl from './assets/pixel/bell.png';
+import miteUrl from './assets/pixel/mite.png';
+import splitterUrl from './assets/pixel/splitter.png';
+import spitterUrl from './assets/pixel/spitter.png';
+import bomberUrl from './assets/pixel/bomber.png';
+import shotbugUrl from './assets/pixel/shotbug.png';
+import rollerUrl from './assets/pixel/roller.png';
+import seederUrl from './assets/pixel/seeder.png';
+import magnetUrl from './assets/pixel/magnet.png';
+import thiefUrl from './assets/pixel/thief.png';
+import broodUrl from './assets/pixel/brood.png';
+import menderUrl from './assets/pixel/mender.png';
 import sabreUrl from './assets/pixel/sabre.png';
 import turretBaseUrl from './assets/pixel/sword-turret-base.png';
 import {XP_PICKUPS, getXpPickup} from './xpPickups';
@@ -39,7 +50,7 @@ const {ringRadius}=require('./hazardGeometry');
 const {bookVisuals}=require('./skillCasts');
 
 const sprites = {};
-Object.entries({knight: knightUrl, enemy: enemyUrl, charger: chargerUrl, shellback: shellbackUrl, lancer: lancerUrl, lancerSpear: lancerSpearUrl, flea: fleaUrl, banner: bannerUrl, stalker: stalkerUrl, hound: houndUrl, swordsaint: swordsaintUrl, crab: crabUrl, forge: forgeUrl, maestro: maestroUrl, rootcrown: rootcrownUrl, stormray: stormrayUrl, centipede: centipedeUrl, warden: wardenUrl, gatekeeper: gatekeeperUrl, duelist: duelistUrl, alchemist: alchemistUrl, sabre: sabreUrl, turretBase: turretBaseUrl, floor: floorUrl, ...Object.fromEntries(XP_PICKUPS.map(tier => [tier.key,tier.url]))}).forEach(([key, url]) => {
+Object.entries({mite:miteUrl,splitter:splitterUrl,spitter:spitterUrl,bomber:bomberUrl,shotbug:shotbugUrl,roller:rollerUrl,seeder:seederUrl,magnet:magnetUrl,thief:thiefUrl,brood:broodUrl,mender:menderUrl,knight: knightUrl, enemy: enemyUrl, charger: chargerUrl, shellback: shellbackUrl, lancer: lancerUrl, lancerSpear: lancerSpearUrl, flea: fleaUrl, banner: bannerUrl, stalker: stalkerUrl, hound: houndUrl, swordsaint: swordsaintUrl, crab: crabUrl, forge: forgeUrl, maestro: maestroUrl, rootcrown: rootcrownUrl, stormray: stormrayUrl, centipede: centipedeUrl, warden: wardenUrl, gatekeeper: gatekeeperUrl, duelist: duelistUrl, alchemist: alchemistUrl, sabre: sabreUrl, turretBase: turretBaseUrl, floor: floorUrl, ...Object.fromEntries(XP_PICKUPS.map(tier => [tier.key,tier.url]))}).forEach(([key, url]) => {
   const img = new Image();
   img.src = url;
   sprites[key] = img;
