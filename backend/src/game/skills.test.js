@@ -5,13 +5,13 @@ const p=(extra={})=>({_id:'p',x:0,y:0,r:25,hp:100,lv:1,sw_angle:Math.PI,sw_r:65,
 const seeded=seed=>()=>(seed=(seed*16807)%2147483647)/2147483647;
 
 test('every offer starts at 40/45/15 and raises gold/prismatic odds until they appear',()=>{
- assert.deepEqual(rules.tierOdds({gold:0,prismatic:0}),{silver:40,gold:45,prismatic:15});
+ assert.deepEqual(rules.tierOdds({gold:0,prismatic:0}),{silver:40,gold:45,prismatic:15,transcendent:0});
  let pity={gold:0,prismatic:0};
- pity=rules.nextPity(pity,'silver');assert.deepEqual(rules.tierOdds(pity),{silver:25,gold:55,prismatic:20});
- pity=rules.nextPity(pity,'gold');assert.deepEqual(pity,{gold:0,prismatic:2});
- assert.deepEqual(rules.tierOdds(pity),{silver:30,gold:45,prismatic:25});
- assert.deepEqual(rules.nextPity(pity,'prismatic'),{gold:0,prismatic:0});
- const odds=rules.tierOdds({gold:20,prismatic:30});assert.equal(odds.silver+odds.gold+odds.prismatic,100);assert.ok(odds.silver>=0&&odds.gold>=0);
+ pity=rules.nextPity(pity,'silver');assert.deepEqual(rules.tierOdds(pity),{silver:25,gold:55,prismatic:20,transcendent:0});
+ pity=rules.nextPity(pity,'gold');assert.deepEqual(pity,{gold:0,prismatic:2,transcendent:0});
+ assert.deepEqual(rules.tierOdds(pity),{silver:30,gold:45,prismatic:25,transcendent:0});
+ assert.deepEqual(rules.nextPity(pity,'prismatic'),{gold:0,prismatic:0,transcendent:0});
+ const odds=rules.tierOdds({gold:20,prismatic:30});assert.equal(odds.silver+odds.gold+odds.prismatic+odds.transcendent,100);assert.ok(odds.silver>=0&&odds.gold>=0);
  // The odds are actually used, from the very first offer.
  const random=seeded(9),seen={silver:0,gold:0,prismatic:0};
  for(let i=0;i<3000;i++)seen[rules.rollOffer([],random,undefined,{gold:0,prismatic:0}).tier]++;
@@ -90,13 +90,45 @@ test('prismatics: storm blades, storm lord bolts, chain reaction and vampire lor
  const foes=[0,1,2,3].map(i=>{const f=b.spawn(lord,'charger');f.hp=f.hpmax=500;f.x=100+i*60;f.y=0;return f;});
  b.step([lord],1000);assert.deepEqual(foes.map(f=>f.hp),[485,485,485,500]);
  b.step([lord],1500);assert.equal(foes[0].hp,485,'cooldown');
- // Chain reaction: a kill explodes and the explosion's kills explode too.
+ // Chain reaction: a kill explodes (180%); its kills explode once more at 90%, then stop.
  const c=new EnemyArena(()=>0);c.nextSpawn=Infinity;const boom=p({sw_angle:0,augments:['chainReaction']});
  const first=c.spawn(boom,'stalker'),second=c.spawn(boom,'stalker'),third=c.spawn(boom,'stalker');
  first.x=0;first.y=-110;first.hp=1;second.x=0;second.y=-220;second.hp=5;third.x=0;third.y=-330;third.hp=500;third.hpmax=500;
- const r=c.attack(boom,1000);assert.equal(second.hp,0);assert.equal(third.hp,480);assert.ok(r.xp>=first.xp+second.xp);
+ const r=c.attack(boom,1000);assert.equal(second.hp,0);assert.equal(third.hp,491);assert.ok(r.xp>=first.xp+second.xp);
  // Vampire lord heals 8% of sword damage.
  const d=new EnemyArena(()=>0);d.nextSpawn=Infinity;const vamp=p({sw_angle:0,lv:41,augments:['vampLord']});
  const target=d.spawn(vamp,'charger');target.hp=target.hpmax=5000;target.x=0;target.y=-110;
  assert.equal(d.attack(vamp,1000).heal,4);
+});
+
+test('turret skills use 80% damage, including thrust, dash and copied blades',()=>{
+ for (const [skillState,blade,expected] of [[{thrust:true},'turret-1',19],[{dash:true},'turret-1',14],[{giant:true},'turret-1',11],[{},'turret-1/twin',8],[{},'turret-1/boomerang',10]]) {
+  const a=new EnemyArena(()=>0),q=p({sw_angle:0,loadout:['turret','thrust','twinBlade','boomerang'],skillState});
+  const e=a.spawn(q,'stalker');e.hp=e.hpmax=500;e.x=900;e.y=110;
+  q.poses=[{blade,x:900,y:0,sw_angle:Math.PI,sw_r:65,sw_w:40,sw_h:100,power:999}];
+  assert.equal(a.attack(q,1000).hits.find(h=>h.id===e.id).damage,expected,blade);
+  if(skillState.dash)assert.ok(e.pushVy>1000);
+ }
+ const a=new EnemyArena(()=>0),q=p({sw_angle:0,loadout:['turret','thrust','giant','accel']});
+ const e=a.spawn(q,'stalker');e.x=900;e.y=110;
+ for(const blade of ['turret-1/twin','turret-1/turret-2','turret-1/main','turret-1/boomerang']) {
+  assert.equal(a.attack({...q,poses:[{blade,x:900,y:0,sw_angle:Math.PI,sw_r:65,sw_w:40,sw_h:100}]},1000+a.attackSerial*200).hits.length,0,blade);
+ }
+});
+
+test('two turrets slam and aftershock independently at their origins with server cooldowns',()=>{
+ const a=new EnemyArena(()=>0),q=p({sw_angle:0,loadout:['turret','slam','thrust','dash'],augments:['aftershock','turretTwin']});
+ const pose=(id,x)=>({blade:`turret-${id}`,x,y:0,sw_angle:0,sw_r:65,sw_w:40,sw_h:100});
+ q.poses=[pose(1,900),pose(2,1200)];
+ const foes=[100,1000,1300].map(x=>{const e=a.spawn(q,'stalker');e.x=x;e.y=0;e.hp=e.hpmax=500;return e;});
+ const bursts=[{kind:'slam',x:0,y:0},{kind:'slam',x:900,y:0,source:'turret-1'},{kind:'slam',x:1200,y:0,source:'turret-2'}];
+ a.attack({...q,bursts},1000);assert.deepEqual(foes.map(e=>e.hp),[475,480,480]);
+ a.attack({...q,bursts},1200);assert.deepEqual(foes.map(e=>e.hp),[475,480,480],'repeats blocked per caster');
+ const after=bursts.map(b=>({...b,kind:'aftershock'}));
+ a.attack({...q,bursts:after},1600);assert.deepEqual(foes.map(e=>e.hp),[460,468,468]);
+ a.attack({...q,bursts:after},1800);assert.deepEqual(foes.map(e=>e.hp),[460,468,468],'aftershock only once');
+ const b=new EnemyArena(()=>0);
+ assert.equal(b.attack({...q,bursts:[{kind:'slam',source:'turret-3',x:900,y:0}]},1000).hits.length,0,'missing turret');
+ assert.equal(b.attack({...q,bursts:[{kind:'slam',source:'turret-1',x:1000,y:0}]},1200).hits.length,0,'incorrect origin');
+ assert.ok(b.attack({...q,bursts:[bursts[1]]},1400).hits.some(h=>h.burst==='slam'),'invalid burst did not spend cooldown');
 });

@@ -107,14 +107,17 @@ test('threat rises with room time: later spawns are tougher and hit harder',()=>
   assert.ok(late.hpmax>early.hpmax);assert.ok(late.contact>early.contact);assert.ok(late.xp>early.xp);
   arena.step([],2e6);assert.equal(arena.threat(2e6).level,1,'an empty room resets');
 });
-test('bomber fuses, then explodes on the player and nearby monsters',()=>{
+test('bomber fuses when close, then explodes on the player and nearby monsters',()=>{
   const arena=new EnemyArena(()=>0),p=player();arena.nextSpawn=Infinity;arena.startedAt=0;
-  const b=arena.spawn(p,'bomber',1000);b.x=80;b.y=0;
-  const other=arena.spawn(p,'charger',1000);other.x=80;other.y=90;other.hp=other.hpmax=500;
-  arena.step([p],1000);assert.equal(b.phase,'fuse');
-  const events=arena.step([p],1000+1000);
+  const b=arena.spawn(p,'bomber',1000);b.x=85;b.y=0;
+  arena.step([p],1000);assert.equal(b.phase,'hunt','does not fuse when still far');
+  b.x=55;b.y=0;
+  const other=arena.spawn(p,'charger',1000);other.x=55;other.y=90;other.hp=other.hpmax=500;
+  arena.step([p],1050);assert.equal(b.phase,'fuse');
+  assert.ok(arena.snapshot(1050).find(e=>e.id===b.id).fuseLeft>0);
+  const events=arena.step([p],1050+1000);
   assert.ok(events.some(e=>e.amount===26));assert.ok(other.hp<500);
-  assert.ok(!arena.enemies.includes(b));assert.equal(arena.state(2000).blasts.length,1);
+  assert.ok(!arena.enemies.includes(b));assert.equal(arena.state(2050).blasts.length,1);
 });
 test('a bomber cut down by the sword blows up its neighbours for the killer',()=>{
   const arena=new EnemyArena(()=>0),p=player();
@@ -141,11 +144,23 @@ test('spitter aims, fires a shot that hurts; a blade swats it, parry sends it ba
   arena.projectiles.push({id:'s-x',owner:'enemy',sourceId:'ai-9',x:5,y:0,vx:0,vy:0,r:9,damage:14,until:9e9});
   assert.deepEqual(arena.step([p],1000).filter(e=>e.amount===14).length,1);
 });
-test('splitter breaks into two mites when killed',()=>{
+test('splitter breaks into 3-4 dashing mites when killed',()=>{
   const arena=new EnemyArena(()=>0),p=player();
   const s=arena.spawn(p,'splitter',0);s.x=0;s.y=-110;s.hp=1;
   arena.attack({...p},1000);
-  assert.deepEqual(arena.enemies.map(e=>e.type),['mite','mite']);
+  assert.ok(arena.enemies.length>=3&&arena.enemies.length<=4);
+  assert.ok(arena.enemies.every(e=>e.type==='mite'&&e.phase==='dash'));
+});
+test('stalker accelerates within range up to a cap and resets on hit',()=>{
+  const arena=new EnemyArena(()=>0),p=player();arena.nextSpawn=Infinity;arena.startedAt=0;arena.lastTime=1000;
+  const s=arena.spawn(p,'stalker',1000,{x:350,y:0});s.hp=s.hpmax=100;
+  arena.step([p],1050);
+  const early=s.ramp;
+  for(let t=1150;t<=7000;t+=100){s.x=350;s.y=0;arena.step([p],t);}
+  assert.ok(s.ramp>early,'ramps up while in range');
+  assert.ok(Math.hypot(s.vx,s.vy)>450&&Math.hypot(s.vx,s.vy)<=560,'exceeds player speed but stays capped');
+  arena.damageEnemy(s,5,'human',{},7000);
+  assert.equal(s.ramp,0,'hit resets stalker ramp');
 });
 test('ghosted players pass through bodies without contact damage',()=>{
   const arena=new EnemyArena(()=>0),p={...player(),skillState:{ghost:true}};arena.nextSpawn=Infinity;arena.startedAt=0;

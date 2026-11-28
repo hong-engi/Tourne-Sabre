@@ -16,6 +16,36 @@ function AugmentCard({augment,owned,disabled,onClick}){
   </Tag>;
 }
 
+const ARROWS=new Set(['ArrowUp','ArrowDown','ArrowLeft','ArrowRight']);
+
+function OwnedAugments({owned,compact}){
+  const [hover,setHover]=useState(null);
+  const list=[...new Set(owned)].map(find).filter(Boolean);
+  const style=a=>({'--tier-color':tierOf(a.tier).color,'--tree-color':treeOf(a).color});
+  const count=a=>a.stack&&rank(owned,a.id)>1?<span className="augment-owned-count">×{rank(owned,a.id)}</span>:null;
+  // While choosing, owned augments shrink to one-line chips; details show on hover.
+  if(compact){
+    const shown=hover&&find(hover);
+    return <section className="augment-owned-list" aria-label="보유 증강" onMouseLeave={()=>setHover(null)}>
+      <h3>보유 증강 <span>{owned.length}</span></h3>
+      <ul className="augment-chips">{list.map(a=>
+        <li key={a.id} className="augment-chip" style={style(a)} title={a.description} onMouseEnter={()=>setHover(a.id)}>
+          <span className="augment-chip-dot"/>{a.name}{count(a)}</li>)}</ul>
+      <p className="augment-chip-detail">{shown?<><b>{shown.name}</b> {shown.description}</>:'증강에 마우스를 올리면 효과가 보여요'}</p>
+    </section>;
+  }
+  const groups=TREES.map(t=>({tree:t,items:list.filter(a=>a.tree===t.id)})).filter(g=>g.items.length);
+  return <section className="augment-owned-list augment-owned-trees" aria-label="보유 증강">
+    {groups.map(({tree,items})=><div key={tree.id} className="augment-tree-col" style={{'--tree-color':tree.color}}>
+      <h3>{tree.name}</h3>
+      <ul>{items.map(a=><li key={a.id} className="augment-owned-row" style={style(a)}>
+        <span className="augment-owned-name">{a.name}{count(a)}</span>
+        <span className="augment-owned-desc">{a.description}</span>
+      </li>)}</ul>
+    </div>)}
+  </section>;
+}
+
 export default function AugmentPicker({hud,onChoose,onReroll,onClose}){
   const panel=useRef(null);
   const [busy,setBusy]=useState(false),[error,setError]=useState(''),[rerolledAt,setRerolledAt]=useState(null);
@@ -34,6 +64,8 @@ export default function AugmentPicker({hud,onChoose,onReroll,onClose}){
   }
   return <div className="augment-overlay"><section ref={panel} className="augment-panel" style={tier?{'--tier-color':tier.color}:undefined} onKeyDown={event=>{
     if(event.key==='Escape'){event.stopPropagation();onClose();}
+    // Held movement keys must not scroll the panel.
+    if(ARROWS.has(event.key))event.preventDefault();
     if(event.key==='Tab'){
       const buttons=[...panel.current.querySelectorAll('button:not(:disabled)')];
       if(event.shiftKey && document.activeElement===buttons[0]){event.preventDefault();buttons[buttons.length-1]?.focus();}
@@ -60,11 +92,7 @@ export default function AugmentPicker({hud,onChoose,onReroll,onClose}){
         </div>;
       })}</div>
     </>}
-    {owned.length>0&&<section className="augment-owned-list" aria-label="보유 증강">
-      {pending>0&&<h3>보유 증강</h3>}
-      <div className="augment-owned-grid">{[...new Set(owned)].map(id=>find(id)).filter(Boolean).map(a=>
-        <AugmentCard key={a.id} augment={a} owned={owned}/>)}</div>
-    </section>}
+    {owned.length>0&&<OwnedAugments owned={owned} compact={pending>0}/>}
     {!pending&&!owned.length&&<p className="augment-waiting">3레벨마다 증강을 고를 수 있어요.</p>}
   </section></div>;
 }

@@ -30,7 +30,7 @@ test('a blank name joins with a random adjective+noun nickname and allows re-ent
   await waitFor(() => expect(screen.queryByLabelText('CHOOSE YOUR NAME')).not.toBeInTheDocument());
   expect(makePlayer).toHaveBeenCalledWith('fluffybunny', defaults);
   expect(screen.getByRole('region', {name:'전투 스킬'})).toBeInTheDocument();
-  fireEvent.click(screen.getByRole('button', {name:'Q 회전 반전'}));
+  fireEvent.click(screen.getByRole('button', {name:'Q 역회전 베기'}));
   expect(activateSkill).toHaveBeenCalledWith('KeyQ');
   expect(screen.queryByRole('progressbar', {name: 'Health'})).not.toBeInTheDocument();
   expect(screen.queryByRole('region', {name: 'Player status'})).not.toBeInTheDocument();

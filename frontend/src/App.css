@@ -109,12 +109,23 @@ button.augment-card:disabled { cursor: default; opacity: .6; }
 .augment-reroll:hover:enabled, .augment-reroll:focus-visible { border-color: var(--tier-color, #b7d993); color: #fff; outline: none; }
 .augment-reroll:disabled { cursor: default; opacity: .45; }
 .augment-waiting { color: #9cb3a7; text-align: center; padding: 30px 0; }
-.augment-owned-list { margin-top: 22px; }
-.augment-owned-list h3 { font-size: 13px; color: #9cb3a7; font-weight: 600; margin: 0 0 10px; }
-.augment-owned-grid { display: grid; grid-template-columns: repeat(auto-fill,minmax(170px,1fr)); gap: 10px; }
-.augment-owned-grid .augment-card { min-height: 0; padding: 11px; gap: 6px; }
-.augment-owned-grid .augment-card-name { font-size: 14px; }
-.augment-owned-grid .augment-card-description { font-size: 11px; }
+.augment-owned-list { margin-top: 18px; }
+.augment-owned-list h3 { font-size: 12px; color: #9cb3a7; font-weight: 600; margin: 0 0 8px; }
+.augment-owned-list h3 span { margin-left: 4px; color: #6f8a7e; font-family: monospace; }
+.augment-owned-list ul { list-style: none; margin: 0; padding: 0; }
+.augment-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.augment-chip { display: inline-flex; align-items: center; gap: 6px; padding: 4px 9px; font-size: 12px; color: #dfe9dc; background: #182c33; border: 1px solid color-mix(in srgb,var(--tier-color) 55%,transparent); cursor: default; }
+.augment-chip:hover { background: #22404a; border-color: var(--tier-color); }
+.augment-chip-dot { width: 7px; height: 7px; flex: none; background: var(--tree-color); }
+.augment-owned-count { margin-left: 2px; font: 11px monospace; color: var(--tier-color); }
+.augment-chip-detail { min-height: 17px; margin: 8px 0 0; font-size: 12px; color: #8ea69a; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.augment-chip-detail b { color: #e3ece1; margin-right: 6px; }
+.augment-owned-trees { margin-top: 0; display: grid; grid-template-columns: repeat(auto-fit,minmax(180px,1fr)); gap: 16px; align-items: start; }
+.augment-tree-col h3 { color: var(--tree-color); padding-bottom: 6px; border-bottom: 1px solid color-mix(in srgb,var(--tree-color) 40%,transparent); }
+.augment-tree-col ul { display: flex; flex-direction: column; gap: 6px; }
+.augment-owned-row { display: flex; flex-direction: column; gap: 2px; padding: 5px 8px; background: #16282f; border-left: 3px solid var(--tier-color); }
+.augment-owned-name { font-size: 13px; font-weight: 600; color: #e3ece1; }
+.augment-owned-desc { font-size: 11px; line-height: 1.45; color: #9fb4a9; }
 @media(max-width:700px) { .augment-offer { grid-template-columns: 1fr; } .augment-card { min-height: 0; } }
 @media(max-width:540px) { .augment-overlay { padding: 12px; } .augment-panel { padding: 16px; } .augment-header h2 { font-size: 20px; } .augment-header p { font-size: 10px; } }
 
@@ -160,3 +171,31 @@ button.augment-card:disabled { cursor: default; opacity: .6; }
 @media(max-width:540px) { .skill-picker-overlay { padding: 12px; } .skill-picker { padding: 16px; } .skill-picker-grid { grid-template-columns: 1fr; } }
 .skill-spell.skill-paused { --state-color: #718079; }
 .skill-slot:not(.skill-spell) + .skill-spell { margin-left: 10px; }
+
+/* Expansion skills without pixel art: a lettered tile per recommended line. */
+.skill-icon-glyph { display:inline-flex; align-items:center; justify-content:center; width:100%; height:100%; min-width:24px; min-height:24px;
+  border-radius:6px; font:700 1.1em system-ui,sans-serif; color:#f4f7ef; background:#2b3b44; box-shadow:inset 0 0 0 2px #0b141a; }
+.skill-icon-glyph[data-line="Q"] { background:#4a3f6e; } .skill-icon-glyph[data-line="W"] { background:#3f5a6e; }
+.skill-icon-glyph[data-line="E"] { background:#2f6a5c; } .skill-icon-glyph[data-line="R"] { background:#6e4a3f; }
+.skill-icon-glyph[data-line="D"] { background:#5c5a2f; } .skill-icon-glyph[data-line="F"] { background:#6e3f55; }
+/* Transcendent augments (AUGMENT.md 3.4): a 3px rainbow border that travels
+   around the card every 2.4s, up to four soft star glints, static when the
+   player asks for reduced motion. Text never moves. */
+@property --rainbow-turn { syntax:'<angle>'; inherits:false; initial-value:0deg; }
+.augment-transcendent { position:relative; background:linear-gradient(180deg,#2c2440,#1a2230); border:3px solid transparent;
+  background-clip:padding-box; isolation:isolate; }
+.augment-transcendent::before { content:''; position:absolute; inset:-3px; border-radius:inherit; z-index:-1; padding:3px;
+  background:conic-gradient(from var(--rainbow-turn),#ff5a5a,#ffa64d,#ffe95a,#6be36b,#5ad2ff,#5a7bff,#b45aff,#ff5a5a);
+  -webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0); -webkit-mask-composite:xor; mask-composite:exclude;
+  animation:rainbow-turn 2.4s linear infinite; box-shadow:0 0 14px #ffffff22; }
+.augment-transcendent::after { content:'✦  ✧  ✦'; position:absolute; top:4px; right:8px; font-size:11px; letter-spacing:4px; color:#fff;
+  opacity:.2; animation:rainbow-glint 1.6s ease-in-out infinite alternate; pointer-events:none; }
+.augment-transcendent .augment-card-meta span:last-child::before { content:'★ '; }
+.augment-transcendent:focus-visible { outline:2px solid #fff; outline-offset:5px; }
+.augment-chip[style*="#ffffff"] .augment-chip-dot { background:conic-gradient(#ff5a5a,#ffe95a,#5ad2ff,#b45aff,#ff5a5a); }
+@keyframes rainbow-turn { to { --rainbow-turn:360deg; } }
+@keyframes rainbow-glint { from { opacity:.1; } to { opacity:.75; } }
+@media (prefers-reduced-motion: reduce) {
+  .augment-transcendent::before, .augment-transcendent::after { animation:none; }
+  .augment-transcendent::after { opacity:.5; }
+}

@@ -1,0 +1,18 @@
+{
+  "step": 19.59375,
+  "intent": "64x64 based on source art brief; diagnostic override, not measured ground truth",
+  "snapper": {
+    "log": "Processing: /Users/stonegi/git/Tourne-Sabre/output/pixel-tool-comparison/input/floor.png\nPixel size: 19.6px (override)\nOutput size: 68x71\nSaved to: /Users/stonegi/git/Tourne-Sabre/output/pixel-tool-comparison/tuned-floor/snapper.png\n",
+    "seconds": 0.325
+  },
+  "fixer": {
+    "cols": 64,
+    "rows": 64,
+    "step_x": 19.5938,
+    "step_y": 19.5938,
+    "consensus": "forced",
+    "confidence": "medium",
+    "detect_s": 0.0,
+    "recon_s": 0.852
+  }
+}

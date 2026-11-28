@@ -1,0 +1,7 @@
+{
+  "display_name": "Tourne-Sabre Feedback UI",
+  "description": "Local skill/augment feedback web UI for Tourne-Sabre on http://localhost:3002",
+  "command": "node",
+  "args": ["/Users/stonegi/git/tourne-sabre/tools/feedback/server.js"],
+  "restart_policy": "on-failure"
+}

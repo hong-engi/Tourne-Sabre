@@ -7,7 +7,8 @@ async function damage(id,amount,now=Date.now()) {
     const p=await Player.findById(id).lean(); if (!p) return;
     const change=rules.resolveDamage(p,Math.max(0,Number(amount)||0),now);
     const result=await Player.updateOne({_id:id,hp:p.hp,shield:p.shield || 0,reviveUsed:!!p.reviveUsed},{$set:change});
-    if (result.matchedCount) return;
+    // before/after feed the play log (actual HP lost after shield/augments).
+    if (result.matchedCount) return {before:{hp:p.hp,hpmax:p.hpmax,shield:p.shieldUntil>now?p.shield||0:0,reviveUsed:!!p.reviveUsed},after:{...change,hpmax:p.hpmax}};
   }
 }
 async function sync(body) {
@@ -28,16 +29,16 @@ async function sync(body) {
     skillState:body.combatState||{},choosingAugment:!!body.augmentMenuOpen,xp,lv,
     hp:{$min:[hpmax,{$add:['$hp',{$max:[0,{$subtract:[hpmax,'$hpmax']}]}]}]},hpmax,
   }}]);
-  await ensureOffer(p._id);
+  return await ensureOffer(p._id);
 }
 // Offers are rolled on the server so the client cannot pick freely. A new one
 // appears whenever a milestone is owed and none is open.
 async function ensureOffer(id) {
   const p=await Player.findById(id).lean();
   if (!p || p.hp<=0 || p.augmentOffer || (p.augments||[]).length>=rules.offerCount(p.lv)) return p;
-  const offer=rules.rollOffer(p.augments,Math.random,kit(p),p.tierPity);
+  const offer=rules.rollOffer(p.augments,Math.random,kit(p),p.tierPity,p.lv||1);
   if (!offer) return p;
-  return await Player.findOneAndUpdate({_id:id,augmentOffer:null},{$set:{augmentOffer:offer,tierPity:rules.nextPity(p.tierPity,offer.tier)}},{new:true}).lean() || p;
+  return await Player.findOneAndUpdate({_id:id,augmentOffer:null},{$set:{augmentOffer:offer,tierPity:rules.nextPity(p.tierPity,offer.tier,{level:p.lv||1})}},{new:true}).lean() || p;
 }
 async function choose(id,augment) {
   const p=await ensureOffer(id);
@@ -70,7 +71,13 @@ async function castSpell(id,spellId,arena) {
   if (now<(spellTimes.get(key)||0)) throw new Error(`${spell.name} 주문이 아직 준비되지 않았습니다.`);
   spellTimes.set(key,now+spell.cooldown*.9);
   if (spellTimes.size>2000) for (const [k,until] of spellTimes) if (until<now) spellTimes.delete(k);
-  if (spellId==='heal') return await Player.findOneAndUpdate({_id:id,hp:{$gt:0}},[{$set:{hp:{$min:['$hpmax',{$add:['$hp',{$round:[{$multiply:['$hpmax',spell.amount]}]}]}]}}}],{new:true}).lean();
+  const mod=rules.modifiers(p.augments),healAmount=spell.amount*mod.healScale*(mod.brink&&p.hp<=(p.hpmax||100)*.3?1.25:1);
+  // X-F01: half of the overheal becomes a 3s shield (up to 12% max health).
+  if (spellId==='heal'&&mod.own.xF01) {
+    const over=Math.max(0,p.hp+Math.round(p.hpmax*healAmount)-p.hpmax),bonus=Math.min(Math.round(over*.5),Math.round(p.hpmax*.12));
+    if (bonus>0) await Player.updateOne({_id:id,hp:{$gt:0}},{$set:{shield:Math.max(p.shieldUntil>now?p.shield||0:0,bonus),shieldUntil:Math.max(p.shieldUntil||0,now+3000)}});
+  }
+  if (spellId==='heal') return await Player.findOneAndUpdate({_id:id,hp:{$gt:0}},[{$set:{hp:{$min:['$hpmax',{$add:['$hp',{$round:[{$multiply:['$hpmax',healAmount]}]}]}]}}}],{new:true}).lean();
   if (spellId==='barrier') {
     const active={$cond:[{$gt:['$shieldUntil',now]},'$shield',0]};
     return await Player.findOneAndUpdate({_id:id,hp:{$gt:0}},[{$set:{shield:{$max:[active,{$round:[{$multiply:['$hpmax',spell.amount]}]}]},
@@ -82,11 +89,11 @@ async function castSpell(id,spellId,arena) {
 async function pickupHeal(id) {
   if (!id) return;
   const now=Date.now();
-  if (now-(healTimes.get(id)||0)<300) return;
+  if (now-(healTimes.get(id)||0)<400) return;
   const p=await Player.findById(id).lean();
   if (!p || p.hp<=0 || !rules.modifiers(p.augments).absorb) return;
   healTimes.set(id,now);
   if (healTimes.size>1000) healTimes.clear();
-  await Player.updateOne({_id:id,hp:{$gt:0}},[{$set:{hp:{$min:['$hpmax',{$add:['$hp',3]}]}}}]);
+  await Player.updateOne({_id:id,hp:{$gt:0}},[{$set:{hp:{$min:['$hpmax',{$add:['$hp',Math.max(1,Math.round(2*rules.modifiers(p.augments).healScale))]}]}}}]);
 }
 module.exports={damage,sync,choose,reroll,ensureOffer,castSpell,pickupHeal};

@@ -6,9 +6,10 @@ import frameUpdate from './frameUpdater';
 import socketIOClient from 'socket.io-client';
 import {bindGameInput} from './input';
 import {createSkills, activate, skillSnapshot} from './skills';
+import {API_ORIGIN} from './apiConfig';
 const {offerCount,DEFAULT_SPELLS,DEFAULT_SKILLS}=require('./gameRules');
 
-const socket = socketIOClient('http://localhost:8081', {transports: ['websocket']});
+const socket = socketIOClient(API_ORIGIN, {transports: ['websocket']});
 let player = null;
 const makePlayer = async (name, loadout={skills:DEFAULT_SKILLS,spells:DEFAULT_SPELLS}) => {
   const next = new Player(name);
@@ -50,7 +51,8 @@ export function activateSkill(code) {
   }
 }
 export function setAugmentMenu(open) {
-  if(player)player.augmentMenuOpen=open;
+  if(!player)return;
+  player.augmentMenuOpen=open;player.augmentMenuAt=0;
 }
 export async function chooseAugment(id) {
   if(!player)return;

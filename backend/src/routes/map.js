@@ -4,6 +4,7 @@ const playerdb = require("../db/playerdb");
 const router  = express.Router();
 const {arena} = require('../game/runtime');
 const playerModel = require('../models/player');
+const {playLog} = require('../game/playLog');
 router.get('/enemy', (req, res) => res.json(arena.state(Date.now())));
 router.post('/enemy/attack', async (req, res) => {
   try {
@@ -12,8 +13,20 @@ router.post('/enemy/attack', async (req, res) => {
     const pos=req.body.pos||{};
     if (player && Number.isFinite(pos.x) && Number.isFinite(pos.y)) {player.x=pos.x;player.y=pos.y;}
     if (player) {player.poses=req.body.poses;player.bursts=req.body.bursts;}
-    const result=arena.attack(player, Date.now());
+    const now=Date.now(),result=arena.attack(player, now);
+    if (player) playLog.attack(player._id,result,now,arena.threat(now).level);
     if (result.heal) await playerModel.updateOne({_id:player._id,hp:{$gt:0}},[{$set:{hp:{$min:['$hpmax',{$add:['$hp',result.heal]}]}}}]);
+    // Expansion skills: blood costs never kill; shields keep the larger
+    // value (60% max health cap), refills add onto the current shield.
+    if (result.hpCost) await playerModel.updateOne({_id:player._id,hp:{$gt:0}},[{$set:{hp:{$max:[1,{$subtract:['$hp',result.hpCost]}]}}}]);
+    if (result.shield||result.shieldAdd) {
+      const fresh=await playerModel.findById(player._id).lean(),now=Date.now();
+      if (fresh&&fresh.hp>0) {
+        const active=fresh.shieldUntil>now?fresh.shield||0:0,cap=Math.round((fresh.hpmax||100)*.6);
+        const shield=Math.min(cap,Math.max(active,result.shield||0)+(result.shieldAdd||0));
+        await playerModel.updateOne({_id:player._id},{$set:{shield,shieldUntil:Math.max(fresh.shieldUntil||0,now+(result.shieldMs||(active?0:2000)))}});
+      }
+    }
     if (result.shieldGained) {
       // Spoils stacks up to 80 but never shrinks a bigger shield (barrier).
       const active=player.shieldUntil>Date.now()?player.shield||0:0;
@@ -24,7 +37,11 @@ router.post('/enemy/attack', async (req, res) => {
 });
 
 router.post('/player/:id/spell', async (req,res)=>{
-  try {res.json(await require('../game/progression').castSpell(req.params.id,req.body&&req.body.spell,arena));}
+  try {
+    const row=await require('../game/progression').castSpell(req.params.id,req.body&&req.body.spell,arena);
+    playLog.spell(req.params.id,req.body&&req.body.spell);
+    res.json(row);
+  }
   catch(err) {res.status(400).json({error:err.message});}
 });
 router.post('/augment/reroll', async (req,res)=>{
@@ -65,6 +82,7 @@ router.post("/test", (req, res) => {
 
 router.post("/player/add", (req, res) => {
   playerdb.add(req.body, (newItem) => {
+    playLog.start(newItem.toObject ? newItem.toObject() : newItem);
     res.json(newItem);
   });
 });
@@ -85,6 +103,7 @@ router.delete("/all", (req, res) => {
 })
 
 router.delete("/player/:id/delete", (req, res) => {
+  playLog.end(req.params.id, 'delete');
   playerdb.remove(req.params.id, () => {
     res.status(200).send();
   });
@@ -98,13 +117,15 @@ router.post("/item/ate", (req, res) => {
 });
 
 router.delete("/player/:id/kill", (req, res) => {
+  playLog.end(req.params.id, 'kill');
   playerdb.remove(req.params.id, () => {
     res.status(200).send();
   });
 });
 
 router.put("/player/:id/damage",(req, res) => {
-  playerdb.damage(req.params.id, req.body.dmg, () => {
+  playerdb.damage(req.params.id, req.body.dmg, (change) => {
+    if (change) playLog.damage(req.params.id, {source:'pvp', raw:Number(req.body.dmg)||0, ...change});
     res.status(200).send();
   });
 });

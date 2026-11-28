@@ -14,7 +14,7 @@ test('augments across three rarities; offers come from one rarity and only offer
   // Every requirement names a real skill or spell.
   const kit=new Set([...SKILLS,...SPELLS].map(s=>s.id));
   AUGMENTS.filter(a=>a.requires).forEach(a=>[].concat(a.requires).forEach(id=>expect(kit.has(id)).toBe(true)));
-  expect(new Set(AUGMENTS.map(a=>a.tier))).toEqual(new Set(['silver','gold','prismatic']));
+  expect(new Set(AUGMENTS.map(a=>a.tier))).toEqual(new Set(['silver','gold','prismatic','transcendent']));
   expect(AUGMENTS.find(a=>a.id==='thorns')).toMatchObject({tree:'resolve',tier:'silver'});
   const offer=rollOffer([],()=>.5);
   expect(offer.options).toHaveLength(3);
@@ -26,8 +26,8 @@ test('augments across three rarities; offers come from one rarity and only offer
 test('giant, rotation and reach augmentations modify the real weapon envelope',()=>{
   const p=new Player('test');p.skills=createSkills();p.augments=['length','spin','reach','duration'];
   activate(p,'KeyW',0);activate(p,'KeyR',0);updateWeapon(p,175,1/60);
-  expect(p.sw_h).toBeCloseTo(231);expect(p.sw_r).toBeCloseTo(297.5);
-  expect(p.skills.until.giant).toBe(6000);expect(p.sw_speed).toBeCloseTo(Math.PI*1.4);
+  expect(p.sw_h).toBeCloseTo(165*1.15);expect(p.sw_r).toBeCloseTo(65+155*1.25);
+  expect(p.skills.until.giant).toBe(4000);expect(p.sw_speed).toBeCloseTo(Math.PI*1.2);
 });
 test('twin thrust supports three charges then sequential recharge',()=>{
   const p=new Player('test');p.augments=['twin'];p.skills=createSkills();p.skills.charges=3;

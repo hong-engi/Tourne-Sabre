@@ -16,10 +16,14 @@ import ignite from './assets/pixel/skills/ignite.png';
 import barrier from './assets/pixel/skills/barrier.png';
 import exhaust from './assets/pixel/skills/exhaust.png';
 import smite from './assets/pixel/skills/smite.png';
+import crescent from './assets/pixel/skills/crescent.png';
+import decoy from './assets/pixel/skills/decoy.png';
+const {SKILLS:SKILL_DEFS,SPELLS:SPELL_DEFS}=require('./gameRules');
+const ALL_DEFS=SKILL_DEFS.concat(SPELL_DEFS);
 
 // Bind artwork to ability identity, so changing QWER / DF loadouts follows it.
 const ICONS = {reverse,giant,accel,thrust,dash,twinBlade,turret,boomerang,slam,
-  blink,ghost,heal,ignite,barrier,exhaust,smite};
+  blink,ghost,heal,ignite,barrier,exhaust,smite,crescent,decoy};
 const DEFAULT_KEYS = {KeyQ:'reverse',KeyW:'giant',KeyE:'accel',KeyR:'thrust'};
 export default function SkillIcon({id,code}) {
   const image=useRef(null);
@@ -41,7 +45,12 @@ export default function SkillIcon({id,code}) {
     observer?.observe(image.current);
     return ()=>{disposed=true;observer?.disconnect();};
   },[src]);
-  if (!src) return null;
+  // Expansion skills have no pixel art yet: show a lettered placeholder.
+  if (!src) {
+    const def=ALL_DEFS.find(d=>d.id===iconId);
+    if (!def) return null;
+    return <span className="skill-icon skill-icon-glyph" data-skill-icon={iconId} aria-hidden="true" data-line={def.line||''}>{def.name.slice(0,1)}</span>;
+  }
   const ready=prepared?.src===src;
   return <img ref={image} className="skill-icon" src={ready?prepared.url:src} alt="" aria-hidden="true" draggable={false} data-skill-icon={iconId} data-outline-size={ready?prepared.size:undefined} width="40" height="40"/>;
 }

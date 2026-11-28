@@ -1,0 +1,16 @@
+{
+  "tourne-sabre-safety-guard": {
+    "PreToolUse": [
+      {
+        "matcher": "write_file|edit_file",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node ./hooks/guard.mjs",
+            "timeout": 5
+          }
+        ]
+      }
+    ]
+  }
+}

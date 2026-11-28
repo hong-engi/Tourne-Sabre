@@ -1,0 +1,11 @@
+services:
+  - type: web
+    name: tourne-sabre
+    runtime: docker
+    plan: free
+    healthCheckPath: /healthz
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: MONGODB_URI
+        sync: false

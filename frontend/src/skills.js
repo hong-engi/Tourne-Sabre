@@ -1,6 +1,7 @@
 // Shared rules use CommonJS for the server; require also avoids CRA 4's
 // production named-export check after Babel inserts ES helper imports.
-const {modifiers,SKILLS:SKILL_DEFS,SPELLS,DEFAULT_SKILLS,DEFAULT_SPELLS}=require('./gameRules');
+const {modifiers,specFor,SKILLS:SKILL_DEFS,SPELLS,DEFAULT_SKILLS,DEFAULT_SPELLS}=require('./gameRules');
+const {castBook,castClassic,recallTurret,bookWeapon,bookBlades}=require('./skillCasts');
 // Q W E R hold any four different skills from SKILL_DEFS; D and F hold the
 // two spells the player brought. Skill state is keyed by skill id, so an
 // augment such as "찌르기 피해" follows the skill to whichever key it sits on.
@@ -58,9 +59,12 @@ function spawnClone(player,at,now) {
 const angleFacing=dir=>Math.atan2(-dir.x,-dir.y);
 function castSpell(player,spell,now) {
   const s=player.skills,mod=modifiers(player.augments);
+  // Expansion spells run through the shared skill book.
+  if (specFor(spell.id)) return castBook(player,spell.id,now);
   if (now<(s.spellCooldowns[spell.id]||0)) return false;
   s.spellCooldowns[spell.id]=now+spell.cooldown;
-  s.spellUntil[spell.id]=now+spell.duration;
+  s.spellUntil[spell.id]=now+spell.duration+(spell.id==='ghost'&&mod.own.xD02?1200:0);
+  castClassic(player,spell.id,now,{x:player.pos.x,y:player.pos.y});
   if (spell.id==='blink') {
     const from={x:player.pos.x,y:player.pos.y};
     player.pos.x+=s.facing.x*spell.distance;player.pos.y+=s.facing.y*spell.distance;
@@ -81,7 +85,10 @@ export function activate(player,code,now) {
   const skill=skillFor(player,code),mod=modifiers(player.augments);
   if (!skill) return false;
   const id=skill.id,at={x:player.pos.x,y:player.pos.y};
+  if (specFor(id)) return castBook(player,id,now)?id:false;
   recharge(player,now);
+  // X-R02: pressing the turret key while one stands calls it back.
+  if (id==='turret' && now<(s.cooldowns.turret||0)) return recallTurret(player,now)?'turretRecall':false;
   if (id==='thrust') {
     if(!s.charges || now<(s.until.thrust || 0))return false;
     if(s.charges===mod.thrustCharges)s.cooldowns.thrust=now+cooldownOf(player,'thrust');
@@ -92,27 +99,46 @@ export function activate(player,code,now) {
     s.cooldowns[id]=now+cooldownOf(player,id);
   }
   if ((id==='thrust'||id==='dash') && mod.pursuit) s.pursuitUntil=now+1500;
+  castClassic(player,id,now,at);
   s.castAt[id]=now;
   s.until[id]=now+durationOf(player,id);
+  if (id==='twinBlade') s.frenzyBonus=0;
   if (id==='reverse') {s.direction*=-1;s.reverseToken++;}
   if (id==='dash') s.dash={dir:{...s.facing},dist:skill.distance*mod.momentum,done:0,angle:angleFacing(s.facing)};
   if (id==='turret') {
     s.turretSeq=(s.turretSeq+1)%1000;
-    s.turrets.push({id:s.turretSeq,x:at.x,y:at.y,angle:player.sw_angle,until:s.until.turret});
+    const copy={pos:{...at},r:player.r,hp:player.hp,augments:player.augments,loadout:player.loadout,spells:player.spells,
+      sw_angle:player.sw_angle,speed:{x:0,y:0},skills:createSkills(),stationary:true};
+    copy.skills.direction=s.direction;
+    // Ongoing weapon buffs also apply when a turret is placed mid-cast.
+    for (const buff of ['giant','accel','twinBlade','reverse']) {
+      copy.skills.until[buff]=s.until[buff];copy.skills.castAt[buff]=s.castAt[buff];
+    }
+    s.turrets.push({id:s.turretSeq,x:at.x,y:at.y,until:s.until.turret,copy});
     while (s.turrets.length>(mod.turretTwin?2:1)) s.turrets.shift();
   }
-  if (id==='boomerang') s.boomerang={start:now,dir:{...s.facing},dist:Math.min(650,skill.distance*mod.longThrow),angle:player.sw_angle};
+  if (id==='boomerang') {
+    const dist=Math.min(650,skill.distance*mod.longThrow);
+    s.boomerang={start:now,from:at,apex:{x:at.x+s.facing.x*dist,y:at.y+s.facing.y*dist},angle:player.sw_angle};
+  }
   if (id==='slam') {
     s.bursts.push({kind:'slam',...at});
     if (mod.aftershock) s.aftershock={at:now+600,...at};
+  }
+  // A turret is a stationary copy of the skill caster, excluding recursive summons.
+  if (id!=='turret') for (const t of s.turrets) {
+    if (t.until<=now) continue;
+    t.copy.augments=player.augments;t.copy.skills.facing={...s.facing};
+    activate(t.copy,code,now);
   }
   return id;
 }
 export function addKills(player,count,now) {
   const s=player.skills,mod=modifiers(player.augments);
   if (!s || !count) return;
+  for (const t of s.turrets) if (t.until>now) addKills(t.copy,count,now);
   // Frenzy: kills while the twin blade is out keep it out longer.
-  if (mod.frenzy && now<(s.until.twinBlade||0)) s.until.twinBlade+=1000*count;
+  if (mod.frenzy && now<(s.until.twinBlade||0)) {const add=Math.min(500*count,4000-(s.frenzyBonus||0));if(add>0){s.until.twinBlade+=add;s.frenzyBonus=(s.frenzyBonus||0)+add;}}
   if (!mod.bloodlust) return;
   s.bloodlust=s.bloodlust.filter(t=>t>now);
   for (let i=0;i<count;i++) s.bloodlust.push(now+4000);
@@ -126,15 +152,17 @@ export function updateWeapon(player,now,dt) {
   const ghost=now<(s.spellUntil.ghost||0),ignite=now<(s.spellUntil.ignite||0);
   const speed=player.speed?Math.hypot(player.speed.x,player.speed.y)*30:0;
   // Top: standing still winds the blade up to triple speed; moving unwinds it.
-  s.topCharge=mod.top?Math.max(0,Math.min(1,s.topCharge+(speed<20?dt/3:-dt*1.2))):0;
+  s.topCharge=mod.top?Math.max(0,Math.min(1,s.topCharge+(speed<20?dt/2:-dt))):0;
   s.bloodlust=s.bloodlust.filter(t=>t>now);
-  const spinBoost=(1+2*s.topCharge)*(1+.35*s.bloodlust.length);
-  let length=mod.length;
-  if (mod.runner) length*=1+Math.min(1,speed/420);
+  const book=bookWeapon(player,now,dt);
+  player.skillSpeed=book.speed;player.cleansing=book.cleanse;
+  const spinBoost=(1+.8*s.topCharge)*(1+.35*s.bloodlust.length)*book.spin;
+  let length=mod.length*book.length;
+  if (mod.runner) length*=1+.4*Math.min(1,speed/420);
   if (mod.cyclone && whirl) length*=2.5;
   player.sw_w=(giant?58:40)*mod.width;player.sw_h=(giant?165:100)*length;player.sw_r=65;
   player.attackMultiplier=thrust?2.4*mod.pierce:dashing?1.8*mod.momentumDamage:giant?1.4:1;
-  player.sw_speed=whirl?s.direction*Math.PI*2/(Q_SPIN_MS/1000):Math.PI*(fast?2.6:1)*s.direction*mod.spin*spinBoost;
+  player.sw_speed=(whirl?s.direction*Math.PI*2/(Q_SPIN_MS/1000):Math.PI*(fast?2.6:1)*s.direction*mod.spin*spinBoost)*(player.hazardSlow||1);
   if(thrust){
     const progress=1-(s.until.thrust-now)/skillDef('thrust').duration;
     player.sw_r+=Math.sin(progress*Math.PI)*155*mod.reach;
@@ -143,7 +171,8 @@ export function updateWeapon(player,now,dt) {
     // Dash: lunge along the facing direction while the blade sweeps across
     // the front, from one side to the other in the spin direction.
     const t=Math.min(1,1-(s.until.dash-now)/skillDef('dash').duration),travel=s.dash.dist*(1-(1-t)**2);
-    player.pos.x+=s.dash.dir.x*(travel-s.dash.done);player.pos.y+=s.dash.dir.y*(travel-s.dash.done);s.dash.done=travel;
+    if (!player.stationary) {player.pos.x+=s.dash.dir.x*(travel-s.dash.done);player.pos.y+=s.dash.dir.y*(travel-s.dash.done);}
+    s.dash.done=travel;
     if (player.bound) player.bound();
     player.sw_angle=s.dash.angle+s.direction*(1.4-2.8*t);
     player.sw_r+=30*Math.sin(t*Math.PI);
@@ -157,7 +186,7 @@ export function updateWeapon(player,now,dt) {
     s.events.push({type:'aftershock',x:s.aftershock.x,y:s.aftershock.y});
     s.aftershock=null;
   }
-  player.combatState={giant,fast,thrust,whirl,ghost,ignite,twin,dash:dashing,reverseToken:s.reverseToken};
+  player.combatState={giant,fast,thrust,whirl,ghost:ghost||book.phase,ignite,twin,dash:dashing,reverseToken:s.reverseToken};
   // Every blade drawn this frame; the server re-checks each one's hits.
   const blades=[{blade:'main',sw_angle:player.sw_angle,sw_r:player.sw_r,sw_w:player.sw_w,sw_h:player.sw_h,power:1}];
   // Extra swords around the player share the circle evenly with the main one.
@@ -177,23 +206,33 @@ export function updateWeapon(player,now,dt) {
   }
   s.turrets=s.turrets.filter(t=>t.until>now);
   for (const t of s.turrets) {
-    // Turrets swing a copy of the player's own sword: same size, spin speed
-    // and direction, so giant, acceleration, reverse and length augments apply.
-    t.angle=thrust||dashing?(t.angle-Math.PI*s.direction*mod.spin*dt)%(Math.PI*2):(t.angle-player.sw_speed*dt)%(Math.PI*2);
-    blades.push({blade:`turret-${t.id}`,x:t.x,y:t.y,sw_angle:t.angle,sw_r:65,sw_w:player.sw_w,sw_h:player.sw_h,power:.8});
+    const copy=t.copy;
+    copy.augments=player.augments;copy.hp=player.hp;
+    copy.skills.bloodlust=[...s.bloodlust];
+    updateWeapon(copy,now,dt);
+    // Dash reproduces the slash without moving the installed base.
+    copy.pos.x=t.x;copy.pos.y=t.y;
+    for (const blade of copy.blades) blades.push({...blade,
+      blade:blade.blade==='main'?`turret-${t.id}`:`turret-${t.id}/${blade.blade}`,
+      x:blade.x??t.x,y:blade.y??t.y,power:blade.power*.8});
+    for (const burst of copy.skills.bursts.splice(0)) s.bursts.push({...burst,source:`turret-${t.id}`});
+    s.events.push(...copy.skills.events.splice(0));
   }
-  // Boomerang: a spinning blade centred on its own position flies out along
-  // the throw direction and comes back to wherever the player is now.
+
+  // Boomerang: a spinning blade centred on its own position flies out in world
+  // space from where it was thrown to a fixed apex, then homes back to wherever
+  // the player is now. Moving after the throw does not bend the outbound leg.
   if (s.boomerang) {
     const b=s.boomerang,t=(now-b.start)/skillDef('boomerang').duration;
     if (t>=1) s.boomerang=null;
     else {
-      const out=b.dist*Math.sin(Math.PI*Math.max(0,t));
+      const k=Math.sin(Math.PI*Math.max(0,t)),base=t<.5?b.from:player.pos;
       b.angle=(b.angle-16*s.direction*dt)%(Math.PI*2);
-      blades.push({blade:'boomerang',x:player.pos.x+b.dir.x*out,y:player.pos.y+b.dir.y*out,sw_angle:b.angle,
+      blades.push({blade:'boomerang',x:base.x+(b.apex.x-base.x)*k,y:base.y+(b.apex.y-base.y)*k,sw_angle:b.angle,
         sw_r:-(player.r||25),sw_w:40*mod.throwSize,sw_h:100*mod.throwSize,power:1.2});
     }
   }
+  bookBlades(player,now,dt,blades);
   player.blades=blades;
 }
 // Same rectangle test the server uses, for client-only checks (harvest).

@@ -4,7 +4,7 @@ const {canChoose,resolveDamage}=require('../../../frontend/src/gameRules');
 const p=()=>({_id:'p',x:0,y:0,r:25,hp:100,lv:1,sw_angle:0,sw_r:65,sw_w:40,sw_h:100,augments:[]});
 test('tip and knockback affect server-confirmed damage and enemy position',()=>{
  const a=new EnemyArena(()=>0),player={...p(),augments:['tip','knockback']};const e=a.spawn(player,'charger');e.x=0;e.y=-130;
- const r=a.attack(player,1000);assert.equal(r.hits[0].damage,18);assert.ok(e.pushVy<0&&e.staggerUntil>1000);
+ const r=a.attack(player,1000);assert.equal(r.hits[0].damage,14);assert.ok(e.pushVy<0&&e.staggerUntil>1000);
 });
 test('reversal bonus applies to five hits; a new Q token refreshes it',()=>{
  const a=new EnemyArena(()=>0),player={...p(),augments:['reverse'],skillState:{reverseToken:1}};const e=a.spawn(player,'charger');e.hp=500;e.x=0;e.y=-90;
@@ -48,23 +48,26 @@ test('offers are one rarity, three distinct choices, and only offered augments c
  assert.equal(canChoose([],2,'thorns',offer),false,'no milestone yet');
  assert.equal(canChoose(['armor','armor'],6,'armor',{tier:'silver',options:['armor']}),false,'max rank');
 });
-test('thorns armor cuts incoming damage and hits back with 300% of attack power',()=>{
+test('thorns no longer cuts damage and hits back with 150% of attack power',()=>{
  for(const lv of [1,11]){
   const a=new EnemyArena(()=>0),player={...p(),lv,augments:['thorns']};a.nextSpawn=Infinity;
   const e=a.spawn(player,'charger');e.hp=e.hpmax=500;e.x=50;e.y=0;
   const events=a.step([player],1000);
-  assert.equal(events.length,1);assert.equal(e.hp,500-(10+lv-1)*3);
-  assert.equal(resolveDamage({...player,hp:100},events[0].amount,1000).hp,100-Math.round(events[0].amount*.75));
+  assert.equal(events.length,1);assert.equal(e.hp,500-Math.round((10+lv-1)*1.5));
+  assert.equal(resolveDamage({...player,hp:100},events[0].amount,1000).hp,100-events[0].amount);
   const r=a.attack({...player,sw_angle:Math.PI},1100);
-  assert.ok(r.hits.some(h=>h.thorns&&h.damage===(10+lv-1)*3));
+  assert.ok(r.hits.some(h=>h.thorns&&h.damage===Math.round((10+lv-1)*1.5)));
  }
 });
-test('stacked augments compound multiplicatively and never zero out',()=>{
+test('stacked augments add up, stop at their max and respect shared caps',()=>{
  const {modifiers,canChoose}=require('../../../frontend/src/gameRules');
  const many=n=>Array(n).fill('haste');
- assert.ok(Math.abs(modifiers(many(3)).hasteCooldown-.75**3)<1e-9);
- assert.ok(modifiers(many(40)).hasteCooldown>0);
- assert.equal(canChoose(Array(5).fill('length'),18,'length',{tier:'silver',options:['length']}),true);
+ assert.ok(Math.abs(modifiers(many(3)).hasteCooldown-.7)<1e-9);
+ assert.ok(Math.abs(modifiers(many(40)).hasteCooldown-.7)<1e-9,'extra copies beyond max do nothing');
+ assert.ok(Math.abs(modifiers(many(3).concat(['perpetual'])).hasteCooldown-.4)<1e-9,'60% cooldown cap');
+ assert.equal(modifiers(['titanForm','colossus','length','length','length']).length,2.8,'length cap');
+ assert.equal(canChoose(Array(2).fill('length'),18,'length',{tier:'silver',options:['length']}),true);
+ assert.equal(canChoose(Array(3).fill('length'),18,'length',{tier:'silver',options:['length']}),false,'stack max 3');
  assert.equal(canChoose(['tip'],6,'tip',{tier:'gold',options:['tip']}),false,'unique augments stay single');
 });
 test('blink-only augments are offered only to players who brought blink',()=>{
@@ -81,4 +84,35 @@ test('extra blades need their augment, and nova fires once per level',()=>{
  assert.ok(a.attack(nova,1400).hits.some(h=>h.burst==='nova'));
  assert.ok(!a.attack(nova,1600).hits.some(h=>h.burst==='nova'),'same level again');
  assert.ok(!a.attack({...player,sw_angle:Math.PI,lv:3,bursts:[{kind:'nova',x:0,y:0}]},1800).hits.some(h=>h.burst),'needs nova');
+});
+test('revised augments: corpse bomb cap, no chained corpse bombs, riposte once, vampire kill cap',()=>{
+ const a=new EnemyArena(()=>0);a.nextSpawn=Infinity;const pl={...p(),sw_angle:0,augments:['corpseBomb']};
+ const first=a.spawn(pl,'stalker'),near=a.spawn(pl,'stalker'),far=a.spawn(pl,'stalker');
+ first.x=0;first.y=-110;first.hp=1;first.hpmax=10000;near.x=0;near.y=-200;near.hp=near.hpmax=1000;far.x=0;far.y=-300;far.hp=far.hpmax=1000;
+ a.attack(pl,1000);assert.equal(near.hp,1000-30,'15% of 10000 capped at 300% attack');assert.equal(far.hp,1000);
+ const b=new EnemyArena(()=>0);b.nextSpawn=Infinity;const rp={...p(),augments:['riposte']};
+ const e=b.spawn(rp,'charger');e.hp=e.hpmax=500;e.x=0;e.y=-90;
+ const swing={...rp,poses:[{sw_angle:Math.PI,sw_r:65,sw_w:40,sw_h:100},{sw_angle:0,sw_r:65,sw_w:40,sw_h:100}]};
+ b.lastHurt.set(String(rp._id),900);
+ assert.equal(b.attack(swing,1000).hits[0].damage,20);assert.equal(b.attack(swing,1250).hits[0].damage,10,'only the first hit doubles');
+});
+test('new augments: first beat, accent, debt, storm math, breather',()=>{
+ const mk=augments=>{const a=new EnemyArena(()=>.99);a.nextSpawn=Infinity;const pl={...p(),augments,hpmax:100};
+  const e=a.spawn(pl,'charger');e.hp=e.hpmax=5000;e.x=0;e.y=-90;
+  return {a,pl,e,swing:{...pl,poses:[{sw_angle:Math.PI,sw_r:65,sw_w:40,sw_h:100},{sw_angle:0,sw_r:65,sw_w:40,sw_h:100}]}};};
+ let t=mk(['firstBeat']);
+ assert.equal(t.a.attack(t.swing,5000).hits[0].damage,15);assert.equal(t.a.attack(t.swing,5250).hits[0].damage,10);
+ t=mk(['accent']);t.a.attack(t.swing,1000);t.a.attack(t.swing,1250);
+ assert.ok(t.a.attack(t.swing,1500).hits.some(h=>h.aug==='accent'&&h.damage===12));
+ t=mk(['debt']);assert.equal(t.a.attack(t.swing,1000).hits[0].damage,13);
+ t=mk(['stormMath']);const o=t.a.spawn(t.pl,'charger');o.hp=o.hpmax=5000;o.x=200;o.y=0;
+ let bolt=false;for(let i=0;i<10;i++)bolt=t.a.attack(t.swing,1000+i*250).hits.some(h=>h.lightning&&h.damage===14)||bolt;
+ assert.ok(bolt);
+ t=mk(['breather']);t.a.lastHurt.set('p',0);t.a.attack(t.swing,6000);
+ assert.equal(t.a.attack(t.swing,8100).heal,2);
+});
+test('new augments are offered and capped like the rest',()=>{
+ const {AUGMENTS,modifiers}=require('../../../frontend/src/gameRules');
+ for(const id of ['firstBeat','scent','breather','accent','critEdge','debt','stormMath','brink'])assert.ok(AUGMENTS.some(a=>a.id===id),id);
+ assert.equal(modifiers(['scent']).pickupRange,1.35);assert.equal(modifiers(['debt']).healScale,.8);
 });

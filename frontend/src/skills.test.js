@@ -40,7 +40,7 @@ test('HUD snapshots distinguish instant cast, cooldown, and ready with augmented
   expect(skillSnapshot(p,1000)[0].state).toBe('ready');
   p.augments=['haste','duration'];activate(p,'KeyE',1200);activate(p,'KeyW',1200);
   const bar=skillSnapshot(p,1300);
-  expect(bar[2].cooldown).toBe(5250);expect(bar[1].duration).toBe(6000);expect(bar[1].activeRemaining).toBe(5900);
+  expect(bar[2].cooldown).toBe(6300);expect(bar[1].duration).toBe(4000);expect(bar[1].activeRemaining).toBe(3900);
 });
 test('Q whips one full turn in the reversed direction, then keeps the normal speed',()=>{
   const {Player}=require('./object');const {createSkills,activate,updateWeapon,Q_SPIN_MS}=require('./skills');
@@ -81,14 +81,19 @@ test('turret stands where it was placed, twin blade mirrors the sword, boomerang
   const blade=name=>p.blades.find(b=>b.blade.startsWith(name));
   expect(blade('turret')).toMatchObject({x:50,y:60});
   expect(blade('twin').sw_angle).toBeCloseTo(p.sw_angle+Math.PI);
-  expect(blade('boomerang').y).toBeLessThan(60-300);expect(blade('boomerang').x).toBe(400);
+  // At the apex the boomerang is where it was thrown toward, not dragged along with the player.
+  expect(blade('boomerang').x).toBeCloseTo(50);expect(blade('boomerang').y).toBeCloseTo(60-320);
+  p.pos.x=50;updateWeapon(p,150,.02);p.pos.x=400;updateWeapon(p,200,.02);
+  expect(blade('boomerang').x).toBeCloseTo(50);expect(blade('boomerang').y).toBeLessThan(60-150);
+  // On the way back it homes to the player's current position.
+  updateWeapon(p,880,.02);expect(Math.hypot(blade('boomerang').x-400,blade('boomerang').y-60)).toBeLessThan(120);
   updateWeapon(p,950,.02);expect(blade('boomerang')).toBeUndefined();
   updateWeapon(p,6100,.02);expect(blade('turret')).toBeUndefined();expect(blade('twin')).toBeUndefined();
 });
-test('haste shortens every QWER cooldown multiplicatively, never to zero',()=>{
+test('haste stops at three copies (-30%)',()=>{
   const p=loadoutPlayer(['slam','dash','turret','boomerang']);p.augments=Array(30).fill('haste');
   const bar=skillSnapshot(p,0);
-  expect(bar[0].cooldown).toBeCloseTo(9000*.75**30);expect(bar[0].cooldown).toBeGreaterThan(0);
+  expect(bar[0].cooldown).toBeCloseTo(9000*.7);expect(bar[0].cooldown).toBeGreaterThan(0);
 });
 test('extra swords share the circle evenly instead of overlapping',()=>{
   const p=loadoutPlayer(['twinBlade','giant','accel','thrust']);p.augments=['doubleEdge'];
@@ -101,4 +106,51 @@ test('turrets copy the player sword, including giant size',()=>{
   activate(p,'KeyQ',0);activate(p,'KeyW',0);updateWeapon(p,100,.02);
   const t=p.blades.find(b=>b.blade.startsWith('turret'));
   expect(t.sw_h).toBe(p.sw_h);expect(t.sw_w).toBe(58);
+});
+
+test('turret thrust locks its own sword angle and extends with the player',()=>{
+  const p=loadoutPlayer(['turret','thrust','giant','accel']);
+  activate(p,'KeyQ',0);updateWeapon(p,100,.1);
+  const angle=p.blades.find(b=>b.blade==='turret-1').sw_angle;
+  p.sw_angle=2;activate(p,'KeyW',100);updateWeapon(p,275,.02);
+  const t=p.blades.find(b=>b.blade==='turret-1');
+  expect(t.sw_angle).toBe(angle);expect(t.sw_r).toBeCloseTo(p.sw_r);expect(t.sw_r).toBeGreaterThan(200);
+  updateWeapon(p,500,.02);expect(p.blades.find(b=>b.blade==='turret-1').sw_r).toBe(65);
+});
+
+test('turrets cast twin blade and boomerang from their own fixed position',()=>{
+  const p=loadoutPlayer(['turret','twinBlade','boomerang','dash']);
+  p.pos.x=50;p.pos.y=60;activate(p,'KeyQ',0);
+  p.pos.x=800;p.skills.facing={x:1,y:0};
+  activate(p,'KeyW',100);activate(p,'KeyE',100);activate(p,'KeyR',100);
+  updateWeapon(p,230,.02);
+  expect(p.blades.find(b=>b.blade==='turret-1')).toMatchObject({x:50,y:60});
+  const twin=p.blades.find(b=>b.blade==='turret-1/twin');
+  expect(twin).toMatchObject({x:50,y:60,power:.8});
+  expect(twin.sw_angle-p.blades.find(b=>b.blade==='turret-1').sw_angle).toBeCloseTo(Math.PI);
+  updateWeapon(p,550,.02);
+  expect(p.blades.find(b=>b.blade==='turret-1/boomerang')).toMatchObject({x:370,y:60,power:.96});
+  updateWeapon(p,990,.02);
+  expect(p.blades.find(b=>b.blade==='turret-1/boomerang').x).toBeLessThan(80);
+  updateWeapon(p,6100,.02);expect(p.blades.some(b=>b.blade.startsWith('turret-'))).toBe(false);
+});
+
+test('two turrets copy slam, expire independently and never recursively summon',()=>{
+  const p=loadoutPlayer(['turret','slam','reverse','accel']);p.augments=['turretTwin','aftershock','haste','haste','haste'];
+  p.pos.x=500;activate(p,'KeyQ',0);p.pos.x=700;activate(p,'KeyQ',8400);
+  expect(p.skills.turrets).toHaveLength(2);
+  expect(p.skills.turrets.every(t=>t.copy.skills.turrets.length===0)).toBe(true);
+  p.pos.x=1000;activate(p,'KeyW',8401);updateWeapon(p,8402,.02);
+  expect(p.skills.bursts).toEqual([
+    {kind:'slam',x:1000,y:0},
+    {kind:'slam',x:500,y:0,source:'turret-1'},
+    {kind:'slam',x:700,y:0,source:'turret-2'},
+  ]);
+  p.skills.bursts=[];updateWeapon(p,9002,.02);
+  expect(p.skills.bursts.map(b=>b.source)).toEqual([undefined,'turret-2']);
+  expect(p.skills.turrets.map(t=>t.id)).toEqual([2]);
+  p.skills.bursts=[];updateWeapon(p,9003,.02);expect(p.skills.bursts).toHaveLength(0);
+  activate(p,'KeyE',9050);activate(p,'KeyR',9050);updateWeapon(p,9100,.02);
+  expect(p.skills.turrets.every(t=>t.copy.skills.direction===p.skills.direction)).toBe(true);
+  expect(p.skills.turrets.every(t=>t.copy.sw_speed===p.sw_speed)).toBe(true);
 });

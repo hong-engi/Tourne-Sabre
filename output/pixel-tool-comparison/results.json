@@ -1,0 +1,256 @@
+[
+  {
+    "asset": "knight",
+    "tool": "snapper",
+    "input_size": [
+      627,
+      627
+    ],
+    "output_size": [
+      63,
+      66
+    ],
+    "seconds": 0.477,
+    "visible_rgb_colors": 16,
+    "alpha_values": [
+      0,
+      1,
+      2,
+      246,
+      249,
+      250,
+      251,
+      252,
+      253,
+      254,
+      255
+    ],
+    "log": "Processing: /Users/stonegi/git/Tourne-Sabre/output/pixel-tool-comparison/input/knight.png\nPixel size: 10.0px (auto-detected)\nOutput size: 63x66\nSaved to: /Users/stonegi/git/Tourne-Sabre/output/pixel-tool-comparison/snapper/knight.png\n"
+  },
+  {
+    "asset": "knight",
+    "tool": "fixer",
+    "input_size": [
+      627,
+      627
+    ],
+    "output_size": [
+      50,
+      50
+    ],
+    "seconds": 3.324,
+    "visible_rgb_colors": 544,
+    "alpha_values": [
+      0,
+      255
+    ],
+    "cols": 50,
+    "rows": 50,
+    "step_x": 12.4994,
+    "step_y": 12.4685,
+    "consensus": "arbitrated",
+    "confidence": "medium",
+    "detect_s": 2.704,
+    "recon_s": 0.592
+  },
+  {
+    "asset": "enemy",
+    "tool": "snapper",
+    "input_size": [
+      627,
+      627
+    ],
+    "output_size": [
+      76,
+      76
+    ],
+    "seconds": 0.066,
+    "visible_rgb_colors": 16,
+    "alpha_values": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      242,
+      246,
+      247,
+      248,
+      250,
+      251,
+      252,
+      253,
+      254,
+      255
+    ],
+    "log": "Processing: /Users/stonegi/git/Tourne-Sabre/output/pixel-tool-comparison/input/enemy.png\nPixel size: 9.0px (auto-detected)\nOutput size: 76x76\nSaved to: /Users/stonegi/git/Tourne-Sabre/output/pixel-tool-comparison/snapper/enemy.png\n"
+  },
+  {
+    "asset": "enemy",
+    "tool": "fixer",
+    "input_size": [
+      627,
+      627
+    ],
+    "output_size": [
+      51,
+      51
+    ],
+    "seconds": 2.876,
+    "visible_rgb_colors": 636,
+    "alpha_values": [
+      0,
+      255
+    ],
+    "cols": 51,
+    "rows": 51,
+    "step_x": 12.4133,
+    "step_y": 12.1982,
+    "consensus": "arbitrated",
+    "confidence": "medium",
+    "detect_s": 2.196,
+    "recon_s": 0.66
+  },
+  {
+    "asset": "sabre",
+    "tool": "snapper",
+    "input_size": [
+      627,
+      627
+    ],
+    "output_size": [
+      39,
+      42
+    ],
+    "seconds": 0.034,
+    "visible_rgb_colors": 15,
+    "alpha_values": [
+      0,
+      1,
+      251,
+      252,
+      253,
+      254
+    ],
+    "log": "Processing: /Users/stonegi/git/Tourne-Sabre/output/pixel-tool-comparison/input/sabre.png\nPixel size: 16.5px (auto-detected)\nOutput size: 39x42\nSaved to: /Users/stonegi/git/Tourne-Sabre/output/pixel-tool-comparison/snapper/sabre.png\n"
+  },
+  {
+    "asset": "sabre",
+    "tool": "fixer",
+    "input_size": [
+      627,
+      627
+    ],
+    "output_size": [
+      52,
+      55
+    ],
+    "seconds": 2.568,
+    "visible_rgb_colors": 262,
+    "alpha_values": [
+      0,
+      255
+    ],
+    "cols": 52,
+    "rows": 55,
+    "step_x": 11.9862,
+    "step_y": 11.4499,
+    "consensus": "arbitrated",
+    "confidence": "medium",
+    "detect_s": 2.012,
+    "recon_s": 0.537
+  },
+  {
+    "asset": "shard",
+    "tool": "snapper",
+    "input_size": [
+      627,
+      627
+    ],
+    "output_size": [
+      45,
+      48
+    ],
+    "seconds": 0.042,
+    "visible_rgb_colors": 11,
+    "alpha_values": [
+      0,
+      1,
+      250,
+      251,
+      252,
+      253,
+      254
+    ],
+    "log": "Processing: /Users/stonegi/git/Tourne-Sabre/output/pixel-tool-comparison/input/shard.png\nPixel size: 14.5px (auto-detected)\nOutput size: 45x48\nSaved to: /Users/stonegi/git/Tourne-Sabre/output/pixel-tool-comparison/snapper/shard.png\n"
+  },
+  {
+    "asset": "shard",
+    "tool": "fixer",
+    "input_size": [
+      627,
+      627
+    ],
+    "output_size": [
+      48,
+      49
+    ],
+    "seconds": 1.257,
+    "visible_rgb_colors": 325,
+    "alpha_values": [
+      0,
+      255
+    ],
+    "cols": 48,
+    "rows": 49,
+    "step_x": 13.0625,
+    "step_y": 12.7959,
+    "consensus": "fast:ac+rl+ss",
+    "confidence": "high",
+    "detect_s": 0.59,
+    "recon_s": 0.629
+  },
+  {
+    "asset": "floor",
+    "tool": "snapper",
+    "input_size": [
+      1254,
+      1254
+    ],
+    "output_size": [
+      91,
+      89
+    ],
+    "seconds": 0.471,
+    "visible_rgb_colors": 16,
+    "alpha_values": [
+      255
+    ],
+    "log": "Processing: /Users/stonegi/git/Tourne-Sabre/output/pixel-tool-comparison/input/floor.png\nPixel size: 14.5px (auto-detected)\nOutput size: 91x89\nSaved to: /Users/stonegi/git/Tourne-Sabre/output/pixel-tool-comparison/snapper/floor.png\n"
+  },
+  {
+    "asset": "floor",
+    "tool": "fixer",
+    "input_size": [
+      1254,
+      1254
+    ],
+    "output_size": [
+      519,
+      512
+    ],
+    "seconds": 6.066,
+    "visible_rgb_colors": 2136,
+    "alpha_values": [
+      255
+    ],
+    "cols": 519,
+    "rows": 512,
+    "step_x": 2.4159,
+    "step_y": 2.4492,
+    "consensus": "arbitrated",
+    "confidence": "medium",
+    "detect_s": 5.164,
+    "recon_s": 0.78
+  }
+]

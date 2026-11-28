@@ -24,7 +24,7 @@ export class MotionBuffer {
     return a.rows.map(r=>{
       const n=next.get(r.id||r._id);if(!n)return r;
       const out={...r,x:r.x+(n.x-r.x)*t,y:r.y+(n.y-r.y)*t};
-      for(const field of ['angle','sw_angle'])if(Number.isFinite(r[field])&&Number.isFinite(n[field]))out[field]=r[field]+Math.atan2(Math.sin(n[field]-r[field]),Math.cos(n[field]-r[field]))*t;
+      for(const field of ['angle','sw_angle','facing'])if(Number.isFinite(r[field])&&Number.isFinite(n[field]))out[field]=r[field]+Math.atan2(Math.sin(n[field]-r[field]),Math.cos(n[field]-r[field]))*t;
       return out;
     });
   }

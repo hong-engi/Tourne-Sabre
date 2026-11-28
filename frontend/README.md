@@ -2,7 +2,7 @@
 
 React canvas arena with server-managed AI opponents. Commands below run from the repository root.
 
-Pixel artwork follows the [ImageGen → Pixel Art Fixer → 16-color workflow](../PIXEL_ART_WORKFLOW.md). The guide covers source preservation, conversion commands, integration, and visual checks. The [16 skill/spell icons](art-source/skill-icons/README.md) include retained sources, prompts, conversion metadata, and a HUD-size preview.
+Pixel artwork follows the [ImageGen → Pixel Art Fixer → 16 colors → direct pixel cleanup workflow](../PIXEL_ART_WORKFLOW.md). Codex finishes blade tips, outlines, gaps, and overlaps with localized pixel edits before checking the actual game size. The guide covers source preservation, conversion commands, and integration. The [16 skill/spell icons](art-source/skill-icons/README.md) include retained sources, prompts, conversion metadata, and a HUD-size preview.
 
 ## Run locally
 
@@ -45,6 +45,8 @@ The tree opens automatically when a new offer is earned. Movement/attacks stop w
 The local player updates with display frames using time-based movement. Remote positions and sword angles interpolate through a 120ms snapshot buffer; extrapolation during jitter is capped at 100ms. The buffer is visual only. Player nicknames use plain text, without panels or quote-like borders; AI monsters have no nameplates. No body hitbox outlines are rendered. Collision geometry is unchanged by visual interpolation.
 
 Confirmed hits emit sparks, a brief white flash, small visual recoil, and floating damage; kills, level-ups, shields, and shockwaves have distinct bursts. Camera shake is bounded to a few pixels. Reduced-motion settings disable shake, flashes, and particle motion. UI/text remain at display resolution.
+
+Level-ups follow the local player with gold ground ripples, a rising light column and sparkles that fade out within 1.5 seconds. Rapid level gains refresh the single effect. Augment pickers wait 800ms so the cue remains visible before the overlay opens; the nova explosion keeps the same delay. Reduced motion uses a stationary halo. Augment acquisition and revival retain their separate feedback.
 
 ## Checks
 

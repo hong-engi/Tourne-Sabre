@@ -1,0 +1,12 @@
+.git
+.agents
+.vscode
+node_modules
+frontend/node_modules
+frontend/build
+frontend/art-source
+backend/node_modules
+backend/logs
+output
+tools
+*.md

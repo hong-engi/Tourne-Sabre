@@ -70,10 +70,10 @@ function getOne(id, callback) {
 }
 
 function update(player, callback) {
-  require('../game/progression').sync(player).then(()=>callback()).catch(err=>{console.error(err.message);callback();});
+  require('../game/progression').sync(player).then(row=>callback(row||null)).catch(err=>{console.error(err.message);callback(null);});
 }
 function damage(id, dhp, callback) {
-  require('../game/progression').damage(id,dhp).then(()=>callback()).catch(err=>{console.error(err.message);callback();});
+  require('../game/progression').damage(id,dhp).then(change=>callback(change)).catch(err=>{console.error(err.message);callback();});
 }
 
 module.exports = {

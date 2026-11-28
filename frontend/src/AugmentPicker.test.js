@@ -22,3 +22,16 @@ test('without a pending pick it lists owned augments only',()=>{
   expect(screen.getByText('단단한 피부')).toBeInTheDocument();
   expect(screen.queryByRole('button',{name:/다시 뽑기/})).not.toBeInTheDocument();
 });
+test('arrow keys held for movement do not scroll the panel',()=>{
+  render(<AugmentPicker hud={{lv:4,augments:['armor'],augmentOffer:null}} onChoose={jest.fn()} onReroll={jest.fn()} onClose={jest.fn()}/>);
+  const close=screen.getByRole('button',{name:'닫기'});
+  ['ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].forEach(key=>expect(fireEvent.keyDown(close,{key,code:key})).toBe(false));
+});
+test('while choosing, owned augments collapse into chips with stack counts',()=>{
+  const hud={lv:6,augments:['armor'],augmentOffer:{tier:'silver',options:['thorns','tip','vampire'],rerolled:[]}};
+  render(<AugmentPicker hud={hud} onChoose={jest.fn()} onReroll={jest.fn()} onClose={jest.fn()}/>);
+  const owned=screen.getByRole('region',{name:'보유 증강'});
+  expect(owned.querySelectorAll('.augment-chip')).toHaveLength(1);
+  fireEvent.mouseEnter(owned.querySelector('.augment-chip'));
+  expect(owned).toHaveTextContent('단단한 피부');
+});

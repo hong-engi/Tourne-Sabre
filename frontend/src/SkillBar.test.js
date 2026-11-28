@@ -6,7 +6,7 @@ import {createSkills,activate,skillSnapshot} from './skills';
 test('ready, active, and cooldown states have distinct labels and button availability',()=>{
   const p=new Player('test');p.skills=createSkills();const cast=jest.fn();
   const view=render(<SkillBar skills={skillSnapshot(p,0)} onActivate={cast}/>);
-  const q=()=>screen.getByRole('button',{name:'Q 회전 반전'});
+  const q=()=>screen.getByRole('button',{name:'Q 역회전 베기'});
   expect(q()).toHaveAttribute('data-state','ready');expect(q()).toHaveTextContent('준비 완료');
   fireEvent.click(q());expect(cast).toHaveBeenCalledWith('KeyQ');
   activate(p,'KeyQ',100);

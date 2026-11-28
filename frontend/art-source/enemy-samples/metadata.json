@@ -1,0 +1,70 @@
+{
+  "stalker": {
+    "source_size": [
+      1254,
+      1254
+    ],
+    "cropped_size": [
+      1030,
+      974
+    ],
+    "cells": 64,
+    "force_step": 16.0938,
+    "native_size": [
+      64,
+      61
+    ],
+    "visible_colors": 16
+  },
+  "hound": {
+    "source_size": [
+      1254,
+      1254
+    ],
+    "cropped_size": [
+      352,
+      1185
+    ],
+    "cells": 64,
+    "force_step": 18.5156,
+    "native_size": [
+      19,
+      64
+    ],
+    "visible_colors": 15
+  },
+  "swordsaint": {
+    "source_size": [
+      1536,
+      1024
+    ],
+    "cropped_size": [
+      1459,
+      990
+    ],
+    "cells": 96,
+    "force_step": 15.1979,
+    "native_size": [
+      96,
+      65
+    ],
+    "visible_colors": 15
+  },
+  "crab": {
+    "source_size": [
+      1312,
+      1199
+    ],
+    "cropped_size": [
+      1069,
+      1139
+    ],
+    "cells": 96,
+    "force_step": 11.8646,
+    "native_size": [
+      90,
+      96
+    ],
+    "visible_colors": 16
+  }
+}

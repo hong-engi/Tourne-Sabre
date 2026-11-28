@@ -26,11 +26,11 @@ class CollisionWorld{
       else if(e.passThrough&&!living.some(p=>Math.hypot(p.x-e.x,p.y-e.y)<(p.r||25)+e.r))e.passThrough=false;
     }
     const bodies=[...living.map(p=>({id:String(p._id),kind:'player',source:p,x:p.x,y:p.y,r:p.r||25,fixed:true})),
-      ...enemies.filter(e=>e.hp>0).map(e=>({id:e.id,kind:'enemy',source:e,x:e.x,y:e.y,r:e.r,mass:e.type==='charger'?2.4:e.type==='stalker' ? .65 : 1}))];
+      ...enemies.filter(e=>e.hp>0).map(e=>({id:e.id,kind:'enemy',source:e,x:e.x,y:e.y,r:e.r,mass:e.mass??(e.type==='charger'?2.4:e.type==='stalker' ? .65 : 1)}))];
     const ignore=(a,b)=>a.kind!==b.kind&&(a.kind==='enemy'?a:b).source.passThrough;
     const contacts=separateBodies(bodies,{previous:this.previous,impulses:false,ignore});
     // Pass-through chargers still hit whoever they overlap.
-    for(const p of bodies)if(p.kind==='player')for(const e of bodies)if(e.kind==='enemy'&&e.source.passThrough){
+    for(const p of bodies)if(p.kind==='player')for(const e of bodies)if(e.kind==='enemy'&&e.source.passThrough&&!e.source.airborne){
       const dx=e.x-p.x,dy=e.y-p.y,d=Math.hypot(dx,dy);
       if(d<p.r+e.r)contacts.push({pair:[p.id,e.id].sort().join('|'),a:p,b:e,nx:d?dx/d:0,ny:d?dy/d:0});
     }
@@ -39,7 +39,7 @@ class CollisionWorld{
       const hit=playerEnemy(c);
       if(!hit||hit.player.source.choosingAugment)continue;
       const {player,enemy,nx,ny}=hit,charging=enemy.source.phase==='charge';
-      events.push({id:player.id,sourceId:enemy.id,amount:charging?Math.round(CHARGE_DAMAGE*(enemy.source.power||1)):enemy.source.contact||13});
+      events.push({id:player.id,sourceId:enemy.id,amount:charging?Math.round(CHARGE_DAMAGE*(enemy.source.power||1)):enemy.source.contact??13});
       if(now<(this.cooldowns.get(c.pair)||0))continue;
       this.cooldowns.set(c.pair,now+600);
       const knock=charging?CHARGE_KNOCKBACK:CONTACT_KNOCKBACK;

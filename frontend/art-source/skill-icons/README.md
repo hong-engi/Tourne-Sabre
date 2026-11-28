@@ -39,6 +39,8 @@ Final assets live in `frontend/src/assets/pixel/skills/`. `SkillIcon.js` maps ab
 
 ## Consistent display outlines
 
+After Fixer and palette reduction, finish tips, diagonal steps, gaps, and crossing points with direct pixel edits in an editor or a coordinate-based script. Preserve the approved silhouette and proportions. A few-pixel defect calls for a local edit, not whole-image regeneration. Save the edits or editable source separately: `prepare.py` rebuilds converter outputs and does not replay hand edits. The following automatic display preparation must also be checked to ensure it preserves those edits.
+
 `frontend/src/skillIconOutline.js` prepares the retained PNGs for their actual UI size. It removes the varying navy source strokes, fits the colored silhouette with nearest-neighbor sampling, and reconstructs one pixel of `#0b1220` ink with two pixels of transparent outer padding. Enclosed dark details and original transparent holes are preserved. Existing near-black ink shades are merged into the common ink color, keeping the visible palette within 16 colors.
 
 `SkillIcon.js` observes its displayed width and caches each prepared image by source and size. A 32px lobby or compact HUD icon is prepared directly on a 32px grid; a 40px picker/HUD icon uses a 40px grid. Shrinking an already outlined image would make stroke widths uneven again. This preparation applies only to skill icons; game animation and text are unchanged. `preview.png` shows the retained Fixer PNGs before this display preparation.

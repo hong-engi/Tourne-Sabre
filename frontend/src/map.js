@@ -1,7 +1,8 @@
 import axios from 'axios';
 import {MotionBuffer} from './motion';
+import {API_ORIGIN} from './apiConfig';
 const {modifiers,stats}=require('./gameRules');
-const api=axios.create({baseURL:'http://localhost:8080/map',timeout:3000});
+const api=axios.create({baseURL:`${API_ORIGIN}/map`,timeout:3000});
 // Shots fly straight at a constant speed, so the client moves them itself.
 // The server only says when one appears, turns (a parry) or disappears; a
 // known shot keeps its own smooth path unless it drifted far from the server.
@@ -32,18 +33,21 @@ class MapState {
     this.syncPending=false;this.attackPending=false;this.nextSync=0;this.nextAttack=0;
     this.enemyMotion=new MotionBuffer(60);this.playerMotion=new MotionBuffer();
     this.enemyPending=false;this.nextEnemy=0;this.nextItems=0;
-    this.projectiles={list:[],at:0};this.threat={level:1,elapsed:0};this.seenBlasts=new Set();
+    this.projectiles={list:[],at:0};this.threat={level:1,elapsed:0};this.seenBlasts=new Set();this.hazards={list:[],at:0};this.skillZones={list:[],walls:[],decoys:[],at:0};
   }
   reset(){this.nextSync=0;this.nextAttack=0;this.enemyList=[];this.enemyMotion.clear();this.playerMotion.clear();this.nextEnemy=0;this.nextItems=0;
-    this.projectiles={list:[],at:0};this.threat={level:1,elapsed:0};this.seenBlasts.clear();}
-  applyRecord(player,row){
+    this.projectiles={list:[],at:0};this.threat={level:1,elapsed:0};this.seenBlasts.clear();this.hazards={list:[],at:0};this.skillZones={list:[],walls:[],decoys:[],at:0};}
+  // Server knockback is a cumulative ledger; apply only what is not acked yet.
+  applyPhysics(player,ledger){
     const ack=player.physicsAck||{seq:0,x:0,y:0,vx:0,vy:0};
-    if((row.physicsSeq||0)>ack.seq){
-      const dx=(row.physicsX||0)-ack.x,dy=(row.physicsY||0)-ack.y;
-      const dvx=(row.physicsVx||0)-ack.vx,dvy=(row.physicsVy||0)-ack.vy;
-      player.pos.x+=dx;player.pos.y+=dy;player.speed.x+=dvx/30;player.speed.y+=dvy/30;
-      player.physicsAck={seq:row.physicsSeq,x:row.physicsX||0,y:row.physicsY||0,vx:row.physicsVx||0,vy:row.physicsVy||0};
-    }
+    if(!ledger||(ledger.seq||0)<=ack.seq)return;
+    const dx=(ledger.x||0)-ack.x,dy=(ledger.y||0)-ack.y;
+    const dvx=(ledger.vx||0)-ack.vx,dvy=(ledger.vy||0)-ack.vy;
+    player.pos.x+=dx;player.pos.y+=dy;player.speed.x+=dvx/30;player.speed.y+=dvy/30;
+    player.physicsAck={seq:ledger.seq,x:ledger.x||0,y:ledger.y||0,vx:ledger.vx||0,vy:ledger.vy||0};
+  }
+  applyRecord(player,row){
+    this.applyPhysics(player,{seq:row.physicsSeq,x:row.physicsX,y:row.physicsY,vx:row.physicsVx,vy:row.physicsVy});
     player.hp=row.hp;player.shield=row.shieldUntil>Date.now()?row.shield:0;player.reviveUsed=row.reviveUsed;player.invulnerableUntil=row.invulnerableUntil;
     if((row.augments||[]).length>=(player.augments||[]).length){
       const twinBefore=modifiers(player.augments).twin;
@@ -73,8 +77,12 @@ class MapState {
       api.get('/enemy').then(r=>{
         const data=Array.isArray(r.data)?{enemies:r.data}:r.data,at=performance.now();
         this.enemyList=data.enemies||[];this.enemyMotion.push(this.enemyList,at);
+        // Knockback rides the fast in-memory poll instead of the DB-backed sync.
+        if(player.hp>0)this.applyPhysics(player,data.physics?.[player.id]);
         this.projectiles=mergeShots(this.projectiles,data.projectiles||[],at);
         if(data.threat)this.threat={...data.threat,at};
+        this.hazards={list:data.hazards||[],at};
+        this.skillZones={list:data.skillZones||[],walls:data.walls||[],decoys:data.decoys||[],at};
         for(const blast of data.blasts||[]){
           if(this.seenBlasts.has(blast.id))continue;
           this.seenBlasts.add(blast.id);this.onBlast?.(blast);
@@ -85,7 +93,9 @@ class MapState {
     if(this.syncPending||now<this.nextSync)return;
     this.nextSync=now+100;this.syncPending=true;
     Promise.all([
-      api.post('/player/update',player).then(()=>api.get(`/player/${player.id}`)).then(r=>{if(r.data)this.applyRecord(player,r.data);}),
+      // An older backend answers with an empty body; fall back to reading the row
+      // so the augment offer (and HP/shield) still reach the client.
+      api.post('/player/update',player).then(r=>r.data||api.get(`/player/${player.id}`).then(g=>g.data)).then(row=>{if(row)this.applyRecord(player,row);}),
       api.get('/player').then(r=>{this.playerList=r.data;this.playerMotion.push(r.data.map(p=>({...p,vx:p.vx*30,vy:p.vy*30})),performance.now());}),
       now>=this.nextItems?(this.nextItems=now+500,api.get('/item').then(r=>{this.itemList=r.data;})):Promise.resolve(),
     ]).catch(err=>console.warn('Arena sync:',err.message)).finally(()=>{this.syncPending=false;});
