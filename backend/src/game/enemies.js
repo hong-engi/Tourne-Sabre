@@ -1017,7 +1017,8 @@ class EnemyArena {
       blasts:this.blasts.map(({id,x,y,r})=>({id,x,y,r})),threat:this.threat(now),
       // Player skill areas, drawn in the owner's colours (timing relative).
       skillZones:this.zones.filter(z=>z.power>0||z.status||z.pull||z.sanctum||z.banner).map(z=>({id:z.id,owner:z.owner,skill:z.skill,kind:z.shape,x:z.x,y:z.y,r:z.r,angle:z.angle,length:z.len,width:z.w,spread:z.spread,
-        age:now-z.born,every:z.every,tag:z.tag,bladeAngle:z.bladeAngle,spinDirection:z.spinDirection,armIn:z.armAt-now,left:z.until-now,warn:!!z.warn,support:!!(z.sanctum||z.banner)})),
+        age:now-z.born,every:z.every,tag:z.tag,bladeAngle:z.bladeAngle,spinDirection:z.spinDirection,armIn:z.armAt-now,left:z.until-now,warn:!!z.warn,support:!!(z.sanctum||z.banner),
+        echo:z.echo||null,echoLead:!!z.echoLead,...(z.echo?{castX:z.castX,castY:z.castY}:{})})),
       walls:this.walls.map(w=>({id:w.id,owner:w.owner,x:w.x,y:w.y,angle:w.angle,length:w.len,width:w.w,left:w.until-now})),
       decoys:this.decoys.map(d=>({id:d.id,owner:d.owner,x:d.x,y:d.y,left:d.until-now})),
       physics:Object.fromEntries(this.physicsLedger||[])};

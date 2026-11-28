@@ -99,3 +99,18 @@ test('skill area snapshots retain charge age and tick spacing for deterministic 
  assert.equal(rain.age,200);assert.equal(rain.armIn,300);assert.equal(rain.every,500);assert.equal(rain.tag,'rain');
  assert.equal(slash.age,200);assert.equal(slash.armIn,400);assert.equal(slash.warn,true);
 });
+
+test('echoArt and timeSplitter snapshots expose echo metadata and causalKnot sets knotUsed flag',()=>{
+ const a=arena(),p=pl(['crossScar','giant','accel','thrust'],['timeSplitter','causalKnot']);
+ a.attack({...p,bursts:[cast('crossScar',{x:10,y:20})]},1000);
+ const echoes=a.state(1200).skillZones.filter(z=>z.echo);
+ assert.equal(echoes.length,2);
+ assert.equal(echoes[0].echo,'timeSplitter');
+ assert.equal(echoes[0].echoLead,true);
+ assert.equal(echoes[1].echoLead,false);
+ assert.equal(echoes[0].castX,10);assert.equal(echoes[0].castY,20);
+ assert.equal(a.zones.find(z=>z.echo).follow,false);
+ a.shapeIncoming([p],[{id:'p',amount:999,source:'x'}],1500);
+ const r=a.attack(p,1600);
+ assert.equal(r.flags.knotUsed,true);
+});

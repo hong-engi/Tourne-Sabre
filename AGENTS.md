@@ -9,7 +9,8 @@ Tourne-Sabre is a browser game with two independent npm packages:
 - `backend/src/app.js`: Express API, Socket.IO, and optional static `frontend/build/` serving on a single port (`process.env.PORT || 8080`). `routes/map.js` defines game endpoints, `models/` defines Mongoose schemas, and `db/` contains persistence helpers.
 - `frontend/src/*.test.js` and `setupTests.js`: frontend input, skills, and UI tests.
 - `backend/src/game/`: shared AI simulation, server loop, and Node.js combat tests.
-- `tools/feedback/`: local skill/augment feedback page (see Feedback Workflow).
+- `tools/feedback/`: standalone skill/augment feedback page; the same list lives in the Lab's 스킬/주문/증강 tabs.
+- [LAB.md](LAB.md): Lab (도감) guide: tabs, files, routes, trigger situations, memo files. Read it before working on the Lab or the user's notes in it.
 - [PIXEL_ART_WORKFLOW.md](PIXEL_ART_WORKFLOW.md): repository-root guide for pixel asset generation, Fixer conversion, 16-color reduction, and direct pixel cleanup. Read it before creating or modifying pixel artwork.
 - [DEPLOY.md](DEPLOY.md): production deployment guide (single-port server, `Dockerfile`, `render.yaml`, MongoDB Atlas, and `MONGODB_URI` / `.env.local` handling).
 
@@ -31,27 +32,14 @@ Run commands from the repository root:
 
 The backend has no build step. Run `npm test --prefix backend` for its Node.js AI/combat tests.
 
-## Feedback Workflow
+## Lab (도감): enemies, skills, spells, augments
 
-The user reviews skills, spells, and augments in a local web UI. Start it with `node tools/feedback/server.js` from the repository root, then open `http://localhost:3002`. It reads `frontend/src/gameRules.js` on every request, so the list always matches the current code. No rebuild or restart is needed after rule edits.
+**Before working on the Lab or acting on what the user wrote in it, read [LAB.md](LAB.md).** It covers URLs, files, routes, trigger situations, memo files and verification. The Lab is the in-game review page: `http://localhost:3000/?lab` (dev) or `:3001` (play build). Its 몬스터 / 스킬 / 주문 / 증강 tabs show every item running on the real game code. It needs the backend.
 
-- Each card shows an animated effect preview on the left, drawn from the skill's `fx`/`move`/`blades` data in `skillBook.js` (the original 16 abilities use the `ORIGINAL` sketches in `server.js`; exclusive augments show their required skill with the augment patch applied). When adding fx fields or new abilities, keep the preview in `index.html` in step.
-- Feedback is saved to `tools/feedback/feedback.json` as `{id: {text, at}}`, keyed by skill/spell/augment id (older entries may also carry a `verdict`).
-- When the user says feedback is ready, read that file and apply each text; if it asks to remove something, also remove augments and combos that depend on it. Then update tests, `AUGMENT.md`, and the :3001 play build.
-- Never delete or overwrite `feedback.json` without asking. To record that items were handled, tell the user instead of editing their entries.
-- When adding new skills or augments, describe them in friendly Korean sentences (what it does → numbers → when to use it) so they read well in this UI and in game.
-
-## Enemy Lab (bestiary and fix notes)
-
+- Enemy notes → `ENEMY_NOTES.json`; skill/spell/augment feedback → `tools/feedback/feedback.json` (the standalone page `node tools/feedback/server.js` on `:3002` shares it).
+- When the user says enemy notes or feedback are ready, follow LAB.md and the linked skills ([enemy-lab-workflow](.agents/skills/enemy-lab-workflow/SKILL.md), [feedback-workflow](.agents/skills/feedback-workflow/SKILL.md)). Never delete or rewrite the user's text in either file without asking.
 - `/lab-check` (또는 `$lab-check`) 요청은 [.agents/skills/lab-check/SKILL.md](.agents/skills/lab-check/SKILL.md)를 실행한다. 모든 Lab 메모를 확인·반영하고, 이전에 완료되어 구현까지 확인한 항목은 삭제한다. 이번에 반영한 항목은 원문을 유지한 `done` 상태로 남긴다.
-
-The user reviews enemies in an in-game page that shows each enemy moving and attacking with the real server AI. Open `http://localhost:3000/?lab` (dev) or `http://localhost:3001/?lab` (play build); `&enemy=<type>` opens one enemy's detail. It needs the backend running.
-
-- Frontend: `frontend/src/EnemyLab.js`/`EnemyLab.css` (mounted from `index.js` when the URL has `?lab`), drawn with `drawLabScene` in `mapdraw.js`. Names and one-line roles come from `enemyNames.js`.
-- Backend: `backend/src/game/lab.js` runs one private `EnemyArena` per type (a dummy player circles it at threat 1; it never touches the real arena or the database). Routes in `backend/src/routes/lab.js`: `GET /lab/types`, `GET /lab/state?types=a,b&attack=1&still=1`, `POST /lab/reset/:type`, `GET /lab/notes`, `PUT /lab/notes/:type`.
-- Notes are saved to `ENEMY_NOTES.json` at the repository root as `{type: {text, status, updatedAt}}`, with status `note` (memo), `todo` (fix requested) or `done` (applied). Empty text removes the entry. `ENEMY_NOTES_FILE` overrides the path (use a temp file in tests).
-- When the user says enemy notes are ready, read `ENEMY_NOTES.json` and apply every `todo` entry (and any `note` that clearly asks for a change) to `bestiary.js`/`enemies.js` and the art in `mapdraw.js`/`enemyArt.js`. Then update tests, `ENEMIES.md` and the :3001 play build, and set only those entries' `status` to `done`, keeping the user's text. Never delete or rewrite their text without asking.
-- When adding a new enemy type, add it to `ENEMY_NAMES` and `ENEMY_SUMMARY` in `enemyNames.js` and to `ENEMIES.md`; the lab lists every non-part type from `TYPES` automatically. Check the new enemy in the lab before calling it done.
+- New enemies, skills, spells and augments must be checked in their Lab tab before they count as done. Describe new skills and augments in friendly Korean sentences (what it does → numbers → when to use it).
 
 ## Coding Style & Naming Conventions
 

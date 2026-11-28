@@ -7,7 +7,7 @@ description: >-
 
 # Enemy Lab & Bestiary Workflow
 
-Follow this procedure when applying enemy fix notes or adding/updating enemies in Tourne-Sabre.
+Follow this procedure when applying enemy fix notes or adding/updating enemies in Tourne-Sabre. Read [LAB.md](../../../LAB.md) first for how the Lab (도감) is built and where its files live.
 
 ## 1. Read Enemy Notes
 

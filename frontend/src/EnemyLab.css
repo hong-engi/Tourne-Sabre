@@ -72,3 +72,50 @@
 
 .lab-stage{position:relative}
 .lab-controls-hint{position:absolute;left:12px;bottom:10px;background:#071018cc;border:1px solid #263e47;border-radius:6px;padding:5px 10px;font-size:11.5px;color:#b8d0d8;pointer-events:none}
+
+/* Lab sections (몬스터 / 스킬 / 주문 / 증강) and the codex tabs */
+.lab-header{flex-wrap:wrap}
+.lab-header>div:first-child{flex:1 1 320px;min-width:0}
+.lab-sections{display:flex;gap:4px;align-self:center}
+.lab-back{white-space:nowrap;align-self:center}
+.lab-sections button{white-space:nowrap;background:#13232b;color:#c9d4cc;border:1px solid #22363f;border-radius:8px;padding:7px 14px;font:inherit;font-size:14px;font-weight:600;cursor:pointer}
+.lab-sections button.on{background:#c4eca6;color:#10201a;border-color:#c4eca6}
+.lab-sections button:hover:not(.on){border-color:#3f6253}
+.lab-select{background:#13232b;color:#c9d4cc;border:1px solid #22363f;border-radius:6px;padding:6px 8px;font:inherit;font-size:13px}
+.codex-count{margin-left:auto}
+.codex-grid{grid-template-columns:repeat(auto-fill,minmax(460px,1fr))}
+.codex-grid li{contain-intrinsic-size:460px 180px}
+.codex-group{grid-column:1/-1}
+.codex-group h2{margin:14px 0 0;font-size:14px;color:#8fa59a;font-weight:600}
+.codex-card{flex-direction:row;align-items:flex-start;gap:12px;padding:8px}
+.codex-canvas{flex:none;align-self:flex-start;background:#1d2129}
+.codex-body{display:flex;flex-direction:column;gap:4px;min-width:0;flex:1}
+.codex-body .lab-card-title,.codex-body .lab-card-sub{padding:0}
+.codex-meta{font-size:11.5px;color:#6f857a}
+.codex-desc{color:#b9c6bd;line-height:1.5;display:-webkit-box;-webkit-line-clamp:5;-webkit-box-orient:vertical;overflow:hidden}
+.codex-fb{font-size:12px;color:#c9d9f0;background:#16243a;border-left:3px solid #9fb3d1;border-radius:4px;padding:4px 7px;white-space:pre-wrap;max-height:4.5em;overflow:hidden}
+.lab-tier.codex-silver{background:#272d35;color:#d4dbe4}
+.lab-tier.codex-gold{background:#3a3220;color:#f2c14e}
+.lab-tier.codex-prismatic{background:#2e2240;color:#d3a6ff}
+.lab-tier.codex-transcendent{background:#3a1d33;color:#ff9be2}
+.lab-tier.codex-skill{background:#1b2535;color:#a4c8f0}
+.lab-tier.codex-spell{background:#1f3328;color:#a6e2b8}
+.codex-situation{background:#0c171d;border:1px solid #263e47;border-radius:8px;padding:10px 12px;display:flex;flex-direction:column;gap:8px}
+.codex-situation h3{margin:0;font-size:12px;color:#ffd88a;letter-spacing:.03em}
+.codex-situation ul{margin:0;padding-left:18px;color:#e8f2ee;font-size:12.5px}
+.codex-toggles{display:grid;grid-template-columns:repeat(2,1fr);gap:6px 10px}
+.codex-toggles label{display:flex;align-items:center;gap:6px;color:#b9c6bd;font-size:12.5px;cursor:pointer}
+.codex-error{margin:8px 20px}
+@media (max-width:640px){.codex-grid{grid-template-columns:1fr}.codex-card{flex-direction:column}.codex-canvas{width:100%!important;height:auto!important;aspect-ratio:4/3}}
+
+/* Folded sidebar sections (훈련장 상황, 통계, 보스 패턴) keep the memo box in view */
+.lab-fold{border:1px solid #1d2e36;border-radius:8px;background:#0c171d}
+.lab-fold>summary{cursor:pointer;list-style:none;padding:8px 12px;font-size:12.5px;font-weight:600;color:#c9d4cc;display:flex;align-items:center;gap:8px;user-select:none}
+.lab-fold>summary::-webkit-details-marker{display:none}
+.lab-fold>summary::before{content:'▸';color:#8fa59a;transition:transform .15s}
+.lab-fold[open]>summary::before{transform:rotate(90deg)}
+.lab-fold>summary:hover{color:#e4e9df}
+.lab-fold>summary:focus-visible{outline:2px solid #c4eca6;outline-offset:2px;border-radius:8px}
+.lab-fold-body{padding:0 10px 10px}
+.lab-fold-body>.codex-situation,.lab-fold-body>.lab-patterns{border:0;padding:0;margin:0;background:none}
+.lab-sidebar>.lab-note{min-height:240px}

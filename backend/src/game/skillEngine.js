@@ -217,7 +217,10 @@ const methods={
       let echo=0;
       if (own.timeSplitter) echo=.7;
       else if (own.echoArt&&this.icd(sk,'echoArt',8000,now)) echo=.45;
-      if (echo) attackZones.forEach(z=>this.zones.push(Object.assign({},z,{id:`z-${++this.sequence}`,armAt:z.armAt+600,nextAt:z.nextAt+600,until:z.until+600,power:z.power*echo,hitIds:new Set(),copy:true})));
+      if (echo) {
+        const echoKind=own.timeSplitter?'timeSplitter':'echoArt';
+        attackZones.forEach((z,idx)=>this.zones.push(Object.assign({},z,{id:`z-${++this.sequence}`,armAt:z.armAt+600,nextAt:z.nextAt+600,until:z.until+600,power:z.power*echo,hitIds:new Set(),copy:true,follow:false,echo:echoKind,echoLead:idx===0,castX:ctx.pos.x,castY:ctx.pos.y})));
+      }
     }
     if (own.heatLeft&&rules.MOVERS.includes(skill)&&this.icd(sk,'heatLeft',2000,now))
       this.addZone(ctx,'heatLeft',{shape:'circle',at:'self',r:100,delay:500,power:1,warn:true});
@@ -423,7 +426,7 @@ const methods={
         this.invulnerableUntil.set(id,now+500);
         if (own.xF11) sk.pendingShield=Math.max(sk.pendingShield||0,Math.round(.15*h)),sk.pendingShieldMs=2000;
       } else if (lethal&&own.causalKnot&&!this.knotUsed.has(id)&&now>=(sk.saveLock||0)) {
-        this.knotUsed.add(id);sk.saveLock=now+10000;
+        this.knotUsed.add(id);sk.saveLock=now+10000;sk.flags.knotUsed=true;
         const trail=this.trails.get(id)||[],back=trail.find(t=>now-t.t<=3000)||{x:p.x,y:p.y};
         this.playerCorrections.push({id,dx:back.x-p.x,dy:back.y-p.y,dvx:0,dvy:0});
         amount=Math.max(0,(p.hp||1)-Math.round(.35*h)+shield);

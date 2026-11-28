@@ -52,7 +52,8 @@ function recharge(player,now) {
 function spawnClone(player,at,now) {
   const s=player.skills;
   s.cloneSeq=(s.cloneSeq+1)%1000;
-  s.clones.push({id:s.cloneSeq,x:at.x,y:at.y,angle:player.sw_angle,until:now+CLONE_MS});
+  const faceLeft=(player.speed&&Math.abs(player.speed.x)>0.5)?player.speed.x<0:((s.facing&&s.facing.x)||0)<-0.1;
+  s.clones.push({id:s.cloneSeq,x:at.x,y:at.y,angle:player.sw_angle,born:now,until:now+CLONE_MS,faceLeft,direction:s.direction});
   if (s.clones.length>3) s.clones.shift();
 }
 // The blade angle whose blade points along a world direction.
@@ -114,7 +115,7 @@ export function activate(player,code,now) {
     for (const buff of ['giant','accel','twinBlade','reverse']) {
       copy.skills.until[buff]=s.until[buff];copy.skills.castAt[buff]=s.castAt[buff];
     }
-    s.turrets.push({id:s.turretSeq,x:at.x,y:at.y,until:s.until.turret,copy});
+    s.turrets.push({id:s.turretSeq,x:at.x,y:at.y,born:now,duration:s.until.turret-now,until:s.until.turret,copy});
     while (s.turrets.length>(mod.turretTwin?2:1)) s.turrets.shift();
   }
   if (id==='boomerang') {
@@ -202,7 +203,8 @@ export function updateWeapon(player,now,dt) {
   s.clones=s.clones.filter(c=>c.until>now);
   for (const c of s.clones) {
     c.angle=(c.angle-Math.PI*2*s.direction*dt)%(Math.PI*2);
-    blades.push({blade:`clone-${c.id}`,x:c.x,y:c.y,sw_angle:c.angle,sw_r:65,sw_w:40,sw_h:100*mod.length,power:.8});
+    blades.push({blade:`clone-${c.id}`,x:c.x,y:c.y,sw_angle:c.angle,sw_r:65,sw_w:40,sw_h:100*mod.length,power:.8,
+      born:c.born,until:c.until,duration:CLONE_MS,faceLeft:!!c.faceLeft,spinDir:c.direction});
   }
   s.turrets=s.turrets.filter(t=>t.until>now);
   for (const t of s.turrets) {
@@ -214,7 +216,8 @@ export function updateWeapon(player,now,dt) {
     copy.pos.x=t.x;copy.pos.y=t.y;
     for (const blade of copy.blades) blades.push({...blade,
       blade:blade.blade==='main'?`turret-${t.id}`:`turret-${t.id}/${blade.blade}`,
-      x:blade.x??t.x,y:blade.y??t.y,power:blade.power*.8});
+      x:blade.x??t.x,y:blade.y??t.y,power:blade.power*.8,
+      ...(blade.blade==='main'?{born:t.born,until:t.until,duration:t.duration}:{})});
     for (const burst of copy.skills.bursts.splice(0)) s.bursts.push({...burst,source:`turret-${t.id}`});
     s.events.push(...copy.skills.events.splice(0));
   }

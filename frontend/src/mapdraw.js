@@ -60,7 +60,7 @@ import floorUrl from './assets/pixel/floor.png';
 import {createEnemySprite,NEW_ENEMY_ART} from './enemyArt';
 import {ENEMY_NAMES} from './enemyNames';
 import {LEVEL_UP_DURATION,drawLevelUpAura} from './levelUpEffect';
-const {draw:drawReverseAfterimage}=require('./reverseAfterimage');
+const {draw:drawReverseAfterimage,silhouette:drawSabreSilhouette}=require('./reverseAfterimage');
 const skillZoneFx=require('./skillZoneFx');
 const {chargeTelegraph}=require('./gameRules');
 const {separateBodies}=require('./bodyPhysics');
@@ -130,6 +130,41 @@ function sprite(ctx, key, x, y, width, height) {
   ctx.imageSmoothingQuality = 'high';
   ctx.drawImage(prepared, x, y, width, height);
   ctx.restore();
+}
+function spriteSilhouette(ctx, key, x, y, width, height, fill) {
+  const img = sprites[key];
+  if (!img || img.complete === false || !(img.naturalWidth || img.width)) return false;
+  const sourceW = img.naturalWidth || img.width;
+  const sourceH = img.naturalHeight || img.height;
+  const scale = Math.min(width / sourceW, height / sourceH);
+  const fittedW = sourceW * scale, fittedH = sourceH * scale;
+  x += (width - fittedW) / 2; y += (height - fittedH) / 2;
+  width = fittedW; height = fittedH;
+  const transform = ctx.getTransform();
+  const dpr = Math.hypot(transform.a, transform.b);
+  const w = Math.max(1, Math.round(width * dpr));
+  const h = Math.max(1, Math.round(height * dpr));
+  const cacheKey = `sil:${key}:${w}:${h}:${fill}`;
+  let prepared = scaledSprites.get(cacheKey);
+  if (!prepared) {
+    prepared = document.createElement('canvas');
+    prepared.width = w; prepared.height = h;
+    const buffer = prepared.getContext('2d');
+    if (!buffer) return false;
+    buffer.imageSmoothingEnabled = false;
+    buffer.drawImage(img, 0, 0, w, h);
+    buffer.globalCompositeOperation = 'source-in';
+    buffer.fillStyle = fill;
+    buffer.fillRect(0, 0, w, h);
+    if (scaledSprites.size >= 256) scaledSprites.delete(scaledSprites.keys().next().value);
+    scaledSprites.set(cacheKey, prepared);
+  }
+  ctx.save();
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = 'high';
+  ctx.drawImage(prepared, x, y, width, height);
+  ctx.restore();
+  return true;
 }
 
 const TAU = Math.PI * 2;
@@ -269,11 +304,82 @@ function extraBlades(ctx,p,time,reduced){
   for(const b of p.blades||[]){
     if(b.blade==='main'||b.x!=null)continue;
     const orb=b.blade.startsWith('orb');
+    const doll=b.blade.startsWith('sk-heart-');
+    if(doll){
+      const age=Number.isFinite(b.born)?Math.max(0,time-b.born):400;
+      const left=Number.isFinite(b.until)?Math.max(0,b.until-time):1000;
+      const fade=Math.min(1,age/140)*Math.min(1,left/240);
+      const anchor=p.r+b.sw_r-b.sw_h*.36;
+      ctx.save();
+      ctx.globalAlpha*=fade;
+      ctx.save();
+      ctx.filter='sepia(.75) saturate(2.5) hue-rotate(8deg) brightness(1.35)';
+      if(!reduced){ctx.shadowColor='#ffd56a';ctx.shadowBlur=10;}
+      trailed(ctx,`${p.id}:${b.blade}`,b.sw_angle,p.r+b.sw_r,b.sw_w,b.sw_h,time,reduced,{length:130,alpha:.32},paintSabre);
+      ctx.restore();
+      ctx.save();
+      ctx.rotate(-b.sw_angle);
+      ctx.translate(0,-anchor);
+      ctx.rotate(b.sw_angle);
+      circle(ctx,0,0,15,'rgba(255,212,110,.16)','rgba(255,222,130,.75)',1.5);
+      if(!reduced){
+        const spin=time/220;
+        for(let i=0;i<6;i++){
+          const a=spin+i*TAU/6;
+          ctx.beginPath();ctx.moveTo(Math.cos(a)*14,Math.sin(a)*14);ctx.lineTo(Math.cos(a)*18,Math.sin(a)*18);
+          ctx.strokeStyle='rgba(255,232,165,.75)';ctx.lineWidth=1.5;ctx.stroke();
+        }
+      }
+      ctx.filter='sepia(.65) saturate(2.2) hue-rotate(8deg) brightness(1.3)';
+      sprite(ctx,'knight',-13,-17,26,34);
+      ctx.filter='none';
+      ctx.restore();
+      ctx.restore();
+      continue;
+    }
     // T-01 rainbow swords: each blade a different hue.
     if(b.rainbow){ctx.save();ctx.filter=`hue-rotate(${(Number(b.blade.slice(-1))*120+time/8)%360}deg) saturate(2.2) brightness(1.2)`;}
     trailed(ctx,`${p.id}:${b.blade}`,b.sw_angle,p.r+b.sw_r,b.sw_w,b.sw_h,time,reduced,{length:orb?160:110,alpha:orb?.35:.2},orb?paintOrb:paintSabre);
     if(b.rainbow)ctx.restore();
   }
+}
+function drawSpectralKnight(ctx,{r=25,faceLeft=false,filter='none',glow=null,alpha=1,chroma=false,scanlines=false,sword=null,reduced=false}={}){
+  const h=r*2+12,w=h*.75;
+  ctx.save();
+  ctx.globalAlpha*=alpha;
+  const drawBody=(ox,f,a)=>{
+    ctx.save();
+    ctx.translate(ox,0);
+    ctx.globalAlpha*=a;
+    ctx.filter=f;
+    if(faceLeft)ctx.scale(-1,1);
+    sprite(ctx,'knight',-w/2,-h/2,w,h);
+    ctx.restore();
+  };
+  if(chroma&&!reduced){
+    drawBody(-2.5,'hue-rotate(190deg) saturate(2.2) brightness(1.55)',.34);
+    drawBody(2.5,'hue-rotate(270deg) saturate(2.2) brightness(1.4)',.26);
+  }
+  ctx.save();
+  ctx.filter=filter;
+  if(glow&&!reduced){ctx.shadowColor=glow;ctx.shadowBlur=12;}
+  if(faceLeft)ctx.scale(-1,1);
+  sprite(ctx,'knight',-w/2,-h/2,w,h);
+  ctx.restore();
+  if(scanlines&&!reduced){
+    ctx.fillStyle='rgba(205,248,255,.2)';
+    for(let y=-h/2+4;y<h/2-2;y+=6)ctx.fillRect(-w/2+2,y,w-4,1.5);
+  }
+  if(sword){
+    ctx.save();
+    ctx.rotate(sword.angle||0);
+    ctx.filter=sword.filter||filter;
+    if((sword.glow||glow)&&!reduced){ctx.shadowColor=sword.glow||glow;ctx.shadowBlur=10;}
+    paintSabre(ctx,sword.w||28,sword.h||85,sword.r??65);
+    ctx.restore();
+  }
+  ctx.filter='none';ctx.shadowBlur=0;
+  ctx.restore();
 }
 // Dash slash: show the crescent the blade sweeps during the lunge. A blade
 // angle a points along world (-sin a, -cos a), i.e. canvas angle -PI/2-a.
@@ -367,25 +473,43 @@ function hazardShape(ctx,h,radius){
 }
 // Player skill areas use cool ally tints (own: teal, others: violet) so they
 // never read as enemy warnings. Support fields (sanctuary, banner) are green.
-function drawSkillZones(ctx,me,size,time,reduced){
-  const sz=map.skillZones||{list:[]},elapsed=Math.max(0,time-(sz.at||time));
+// `me` centres the view; `hero` owns the zones (the Lab passes its own
+// camera, zone list and knight).
+function drawSkillZones(ctx,me,size,time,reduced,source=map.skillZones,hero=me){
+  const sz=source||{list:[]},elapsed=Math.max(0,time-(sz.at||time));
   const screen=(x,y)=>[size.width/2+x-me.pos.x,size.height/2+y-me.pos.y];
   for(const raw of sz.list||[]){
     const z={...raw,age:(raw.age||0)+elapsed,armIn:raw.armIn-elapsed,left:raw.left-elapsed};
     if(z.left<0)continue;
     const [x,y]=screen(z.x,z.y),reach=(z.length||0)+(z.r||0)+60;
     if(x<-reach||x>size.width+reach||y<-reach||y>size.height+reach)continue;
-    const own=z.owner===me.id,tint=z.support?'140,220,150':own?'120,230,220':'190,160,255';
+    const own=z.owner===hero.id,tint=z.support?'140,220,150':own?'120,230,220':'190,160,255';
     if(z.tag==='afterSpin'){
       ctx.save();ctx.translate(x,y);
       drawReverseAfterimage(ctx,-z.armIn,z.bladeAngle||0,z.spinDirection||1,z.r,
-        (c,r)=>paintSabre(c,32,100,r-50),reduced);
+        (c,r,isHead)=>{
+          const fill=isHead?'#dcfffb':'#5beee2';
+          c.save();
+          if(isHead&&!reduced){c.shadowColor='#5cf2e6';c.shadowBlur=12;}
+          if(!spriteSilhouette(c,'sabre',-16,-(r-50)-50,32,100,fill))drawSabreSilhouette(c,r,isHead);
+          c.restore();
+        },reduced);
       ctx.restore();continue;
     }
     ctx.save();ctx.translate(x,y);
-    if(skillZoneFx.draw(ctx,z,{tint,reduced,paintGhost:c=>{
-      sprite(c,'knight',-21,-28,42,56);
-      c.save();c.rotate((z.angle||0)+Math.PI/2);paintSabre(c,28,85,65);c.restore();
+    if(skillZoneFx.draw(ctx,z,{tint,reduced,paintGhost:(c,opts={})=>{
+      const mode=opts.mode||'echo';
+      const styles={
+        echo:{filter:'hue-rotate(140deg) saturate(2.1) brightness(1.45)',glow:'#6ef7e8',chroma:true},
+        echo2:{filter:'hue-rotate(205deg) saturate(2.3) brightness(1.45)',glow:'#a7b8ff',chroma:true},
+        echoArt:{filter:'hue-rotate(155deg) saturate(2.2) brightness(1.45)',glow:'#7df5ff',chroma:true},
+        timeSplitter:{filter:'hue-rotate(245deg) saturate(2.2) brightness(1.4)',glow:'#d7a6ff',chroma:true},
+        fold:{filter:'hue-rotate(185deg) saturate(2) brightness(1.5)',glow:'#8cc8ff',chroma:true},
+      };
+      const st=styles[mode]||styles.echo;
+      const swAngle=Number.isFinite(opts.sweepAngle)?opts.sweepAngle:(opts.angle||0)+Math.PI/2;
+      drawSpectralKnight(c,{r:24,filter:st.filter,glow:st.glow,chroma:st.chroma,scanlines:mode==='echoArt'||mode==='fold',reduced,
+        sword:{angle:swAngle,w:30,h:88,r:62}});
     }})){ctx.restore();continue;}
     hazardShape(ctx,z,0);
     if(z.armIn>0){
@@ -406,21 +530,99 @@ function drawSkillZones(ctx,me,size,time,reduced){
     ctx.restore();
   }
   for(const d of sz.decoys||[]){
-    if(d.left-elapsed<0)continue;
+    const left=d.left-elapsed;
+    if(left<0)continue;
     const [x,y]=screen(d.x,d.y);
-    ctx.save();ctx.translate(x,y);ctx.globalAlpha=.55*Math.min(1,(d.left-elapsed)/180);
-    circle(ctx,0,0,27,'#8fd0ff11','#8fd0ff88',1.5);
-    sprite(ctx,'knight',-21,-28,42,56);ctx.rotate(-Math.PI/4);paintSabre(ctx,28,85,65);ctx.restore();
+    const fade=Math.min(1,left/220),prog=Math.max(0,Math.min(1,left/2500));
+    const jitter=reduced?0:(Math.sin(time/55)*1.4);
+    ctx.save();ctx.translate(x+jitter,y);ctx.globalAlpha*=.82*fade;
+    if(!reduced){
+      for(let i=0;i<2;i++){
+        const wave=((time/900+i*.5)%1);
+        circle(ctx,0,0,28+wave*46,null,`rgba(143,208,255,${.48*(1-wave)})`,1.8);
+      }
+    }
+    circle(ctx,0,0,29,'rgba(143,208,255,.14)','rgba(165,225,255,.45)',1.5);
+    ctx.beginPath();ctx.arc(0,0,29,-Math.PI/2,-Math.PI/2+TAU*prog);ctx.strokeStyle='#b8ebff';ctx.lineWidth=2.5;ctx.stroke();
+    drawSpectralKnight(ctx,{r:24,filter:'hue-rotate(165deg) saturate(1.9) brightness(1.45)',glow:'#8fd0ff',chroma:true,scanlines:true,reduced,
+      sword:{angle:-Math.PI/4+(reduced?0:Math.sin(time/240)*.14),w:28,h:84,r:62}});
+    ctx.restore();
   }
-  // Local-only book objects: gates, anchors, garden and banner outlines.
-  for(const v of bookVisuals(me,time)){
-    if(['garden','banner'].includes(v.kind)&&(sz.list||[]).some(z=>z.owner===me.id&&
+  // Local-only book objects: gates, anchors, garden, banner and causal-knot ghost.
+  for(const v of bookVisuals(hero,time)){
+    if(['garden','banner'].includes(v.kind)&&(sz.list||[]).some(z=>z.owner===hero.id&&
       z.skill===(v.kind==='garden'?'timeGarden':'warBanner')&&z.left>elapsed))continue;
     const [x,y]=screen(v.x,v.y);
     ctx.save();
     if(v.kind==='gate'){circle(ctx,x,y,30,'#c9a8ff33','#c9a8ffdd',2.5);}
     else if(v.kind==='anchor'){ctx.strokeStyle='#9fe3ff';ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(x,y-12);ctx.lineTo(x,y+10);ctx.moveTo(x-9,y+4);ctx.quadraticCurveTo(x,y+16,x+9,y+4);ctx.stroke();}
+    else if(v.kind==='causalGhost'){
+      const [hx,hy]=screen(hero.pos.x,hero.pos.y);
+      ctx.save();
+      ctx.strokeStyle=v.ready?'rgba(242,193,78,.36)':'rgba(195,155,255,.25)';
+      ctx.lineWidth=1.8;ctx.setLineDash([5,6]);
+      ctx.beginPath();ctx.moveTo(x,y);ctx.lineTo(hx,hy);ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.translate(x,y);
+      circle(ctx,0,0,26,v.ready?'rgba(242,193,78,.14)':'rgba(195,155,255,.1)',v.ready?'rgba(255,216,120,.82)':'rgba(195,155,255,.6)',1.8);
+      if(!reduced){
+        const hand=time/300;
+        ctx.strokeStyle='rgba(255,228,155,.78)';ctx.lineWidth=1.8;
+        ctx.beginPath();ctx.moveTo(0,0);ctx.lineTo(Math.cos(hand)*18,Math.sin(hand)*18);ctx.stroke();
+      }
+      drawSpectralKnight(ctx,{r:22,alpha:v.ready?.7:.45,filter:'hue-rotate(250deg) saturate(2) brightness(1.38)',glow:'#e8c170',chroma:v.ready,reduced});
+      ctx.restore();
+    }
     else {ctx.setLineDash([4,6]);circle(ctx,x,y,v.r,null,v.kind==='garden'?'#b6f0ff88':'#ffe28a88',1.5);ctx.setLineDash([]);}
+    ctx.restore();
+  }
+}
+// Blades that stand apart from the player: mirror clones, turrets, the
+// boomerang. `origin` is the world point at the centre of the view.
+function drawDetachedBlades(ctx,me,origin,size,time,reduced){
+  for(const c of me.blades||[]){
+    if(c.x==null)continue;
+    const x=size.width/2+c.x-origin.x,y=size.height/2+c.y-origin.y,kind=c.blade.includes('/')?c.blade.split('/')[1].split('-')[0]:c.blade.split('-')[0];
+    ctx.save();ctx.translate(x,y);
+    if(kind==='clone'){
+      const age=Number.isFinite(c.born)?Math.max(0,time-c.born):500;
+      const dur=c.duration||2000;
+      const left=Number.isFinite(c.until)?Math.max(0,c.until-time):dur;
+      const life=Math.max(0,Math.min(1,left/dur));
+      const fade=Math.min(1,age/120)*Math.min(1,left/260);
+      ctx.globalAlpha*=fade;
+      if(age<220&&!reduced){
+        const k=age/220;
+        circle(ctx,0,0,me.r*(1+k*1.5),null,`rgba(142,230,255,${.85*(1-k)})`,2.5*(1-k)+.5);
+        ctx.strokeStyle=`rgba(220,250,255,${.85*(1-k)})`;ctx.lineWidth=2;
+        ctx.beginPath();ctx.moveTo(0,-me.r*1.6);ctx.lineTo(0,me.r*1.6);ctx.stroke();
+      }
+      circle(ctx,0,0,me.r+6,'rgba(110,210,255,.14)','rgba(142,230,255,.28)',1.5);
+      ctx.beginPath();ctx.arc(0,0,me.r+6,-Math.PI/2,-Math.PI/2+TAU*life);
+      ctx.strokeStyle='rgba(165,240,255,.9)';ctx.lineWidth=2.5;ctx.stroke();
+      drawSpectralKnight(ctx,{r:me.r,faceLeft:!!c.faceLeft,alpha:.82,filter:'hue-rotate(155deg) saturate(1.9) brightness(1.45)',glow:'#6ce2ff',chroma:true,scanlines:true,reduced});
+      if(!reduced){
+        const dir=c.spinDir||1,radius=me.r+c.sw_r+c.sw_h*.35,tip=-Math.PI/2-c.sw_angle,tail=tip+dir*1.05;
+        ctx.beginPath();ctx.arc(0,0,radius,tail,tip,dir>0);
+        ctx.strokeStyle='rgba(165,245,255,.6)';ctx.lineWidth=3;ctx.stroke();
+      }
+      ctx.save();
+      ctx.filter='hue-rotate(155deg) saturate(2) brightness(1.45)';
+      if(!reduced){ctx.shadowColor='#6ce2ff';ctx.shadowBlur=10;}
+      trailed(ctx,`${me.id}:${c.blade}`,c.sw_angle,me.r+c.sw_r,c.sw_w,c.sw_h,time,reduced,{length:190,alpha:.42},paintSabre);
+      ctx.restore();
+      ctx.restore();continue;
+    }
+    if(kind==='turret'){
+      if(Number.isFinite(c.until)){
+        const dur=c.duration||6000,life=Math.max(0,Math.min(1,(c.until-time)/dur));
+        circle(ctx,0,0,24,'rgba(130,225,210,.12)','rgba(130,225,210,.25)',1.5);
+        ctx.beginPath();ctx.arc(0,0,24,-Math.PI/2,-Math.PI/2+TAU*life);
+        ctx.strokeStyle='rgba(235,218,145,.88)';ctx.lineWidth=2.2;ctx.stroke();
+      }
+      sprite(ctx,'turretBase',-20,-20,40,40);
+    }
+    trailed(ctx,`${me.id}:${c.blade}`,c.sw_angle,me.r+c.sw_r,c.sw_w,c.sw_h,time,reduced,{length:kind==='boomerang'?90:120,alpha:.3},paintSabre);
     ctx.restore();
   }
 }
@@ -907,18 +1109,7 @@ function drawWorld(ctx, me, size, time, reduced) {
       circle(ctx,x,y,shot.r||8,fill,edge,2);
       if(shot.kind==='wheel'||shot.kind==='sickle'){ctx.save();ctx.translate(x,y);ctx.rotate(reduced?0:time/80);ctx.strokeStyle=edge;ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(-(shot.r||8),0);ctx.lineTo(shot.r||8,0);ctx.stroke();ctx.restore();}
     }
-    // Blades that stand apart from the player: mirror clones, turrets, the boomerang.
-    for(const c of me.blades||[]){
-      if(c.x==null)continue;
-      const x=width/2+c.x-me.pos.x,y=height/2+c.y-me.pos.y,kind=c.blade.includes('/')?c.blade.split('/')[1].split('-')[0]:c.blade.split('-')[0];
-      ctx.save();ctx.translate(x,y);
-      if(kind==='clone'){ctx.globalAlpha=.45;circle(ctx,0,0,me.r,'#8fb8ff33','#8fb8ffaa',1.5);}
-      if(kind==='turret'){
-        sprite(ctx,'turretBase',-20,-20,40,40);
-      }
-      trailed(ctx,`${me.id}:${c.blade}`,c.sw_angle,me.r+c.sw_r,c.sw_w,c.sw_h,time,reduced,{length:kind==='boomerang'?90:120,alpha:kind==='clone'?.2:.3},paintSabre);
-      ctx.restore();
-    }
+    drawDetachedBlades(ctx,me,me.pos,size,time,reduced);
     effects.forEach(fx=>{
       if(fx.type!=='levelUp')return;
       const pos=fx.targetId===me.id?me.pos:fx;
@@ -1016,8 +1207,19 @@ export function drawLabScene(ctx,scene,size,time,{at=time,zoom=1,reduced=false,s
   ctx.stroke();
   const fxReduced=reduced||simple;
   drawHazards(ctx,me,world,time,fxReduced,{list:scene.hazards||[],at:at+delay});
+  // Skill areas, walls and decoys from the server skill engine (codex tabs).
+  if(scene.skillZones?.length||scene.walls?.length||scene.decoys?.length)
+    drawSkillZones(ctx,me,world,time,fxReduced,{list:scene.skillZones||[],walls:scene.walls||[],decoys:scene.decoys||[],at},player||{id:'lab-dummy'});
   const dx=world.width/2+d.x-cx,dy=world.height/2+d.y-cy;
   const hero=player?player:{id:`lab-dummy-${scene.type}`,pos:{x:d.x,y:d.y},r:d.r,hp:1,hpmax:1,speed:{x:(d.vx||0)/30,y:(d.vy||0)/30},sw_angle:d.sw_angle,sw_r:d.sw_r,sw_w:d.sw_w,sw_h:d.sw_h,blades:[]};
+  if(player){
+    drawDetachedBlades(ctx,player,{x:cx,y:cy},world,time,fxReduced);
+    effects.forEach(fx=>{
+      if(fx.type!=='levelUp')return;
+      const pos=fx.targetId===player.id?player.pos:fx;
+      drawLevelUpAura(ctx,world.width/2+pos.x-cx,world.height/2+pos.y-cy,Math.max(0,time-fx.born),fxReduced,fx.seed);
+    });
+  }
   actor(ctx,hero,true,dx,dy,time,fxReduced);
   enemies.forEach(e=>drawEnemy(ctx,e,me,world,time,fxReduced));
   const renderTime=time-delay;

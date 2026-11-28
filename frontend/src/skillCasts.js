@@ -167,7 +167,7 @@ export function bookWeapon(player,now,dt){
     }
   }
   // T-04: every 8s a pair of small dolls for 3s.
-  if(mod.own.workshopHeart&&now>=b.heartAt){b.heartAt=now+8000;b.blades.heart={count:2,r:110,w:30,h:64,power:.55,until:now+3000,speed:1.6};}
+  if(mod.own.workshopHeart&&now>=b.heartAt){b.heartAt=now+8000;b.blades.heart={count:2,r:110,w:30,h:64,power:.55,born:now,duration:3000,until:now+3000,speed:1.6};}
   if(b.nebulaUntil>now)b.blades.nebula={count:2,r:95,w:20,h:46,power:.45,until:b.nebulaUntil,speed:2.6};
   if(mod.own.rainbowKing)b.blades.rainbow={count:3,r:0,w:34,h:80,power:.6,until:now+1000,speed:0,rainbow:true};
   const phase=now<b.phaseUntil;
@@ -189,7 +189,8 @@ export function bookBlades(player,now,dt,blades){
         continue;
       }
       const wobble=o.wobble?Math.sin(now/400+i)*45:0,orbit=o.r+wobble;
-      blades.push({blade:`sk-${kind}-${i}`,sw_angle:o.angle+i*Math.PI*2/o.count,sw_r:Math.max(0,orbit-(player.r||25)-o.h/2),sw_w:o.w,sw_h:o.h,power:o.power});
+      blades.push({blade:`sk-${kind}-${i}`,sw_angle:o.angle+i*Math.PI*2/o.count,sw_r:Math.max(0,orbit-(player.r||25)-o.h/2),sw_w:o.w,sw_h:o.h,power:o.power,
+        ...(kind==='heart'?{born:o.born,until:o.until,duration:o.duration||3000,doll:true}:{})});
     }
   }
   // X-W01: a back blade while giant.
@@ -211,6 +212,7 @@ export function applyBookResult(player,result,now){
   if(f.nebula)b.nebulaUntil=now+f.nebula;
   if(f.dance)b.danceUntil=now+f.dance;
   if(f.outStep)b.outStepUntil=now+f.outStep;
+  if(f.knotUsed)b.knotUsed=true;
   if(f.accelPlus&&now<(s.until.accel||0))s.until.accel+=f.accelPlus;
   for(const m of result.marks||[])if(m.tag==='eye')b.mark={x:m.x,y:m.y,at:now};
   // X-Q03: boomerang hits on the way back shave its cooldown.
@@ -236,5 +238,9 @@ export function bookVisuals(player,now){
   if(b.anchor)out.push({kind:'anchor',x:b.anchor.x,y:b.anchor.y});
   if(b.garden&&now<b.garden.until)out.push({kind:'garden',x:b.garden.x,y:b.garden.y,r:b.garden.r});
   if(b.banner&&now<b.banner.until)out.push({kind:'banner',x:b.banner.x,y:b.banner.y,r:b.banner.r});
+  if(modifiers(player.augments).own.causalKnot&&!b.knotUsed&&b.history.length>1&&now-b.history[0].t>=400){
+    const back=b.history.find(h=>now-h.t<=3000)||b.history[0];
+    out.push({kind:'causalGhost',x:back.x,y:back.y,ready:now-b.history[0].t>=2800,trail:b.history.filter((_,i)=>i%6===0)});
+  }
   return out;
 }
